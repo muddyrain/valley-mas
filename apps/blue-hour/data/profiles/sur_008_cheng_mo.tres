@@ -1,0 +1,19 @@
+[gd_resource type="Resource" script_class="SurvivorProfile" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/survivor_profile.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "SUR_008"
+name = "程茉"
+age = 0
+occupation = "社区活动策划兼职"
+role = "团队强化"
+personality = "敏感、善于倾听，能察觉群体何时开始紧张或疲惫。"
+background = "她擅长观察一个群体的情绪变化，并在关键时刻把大家的注意力拉回来。"
+before_apocalypse = "灾变前，她参与社区活动策划，长期处理人群情绪与现场节奏。"
+after_apocalypse = "灾变后，她让队伍在压力最高的时候重新稳住注意力，抓住短暂的爆发窗口。"
+trait_explanation = "鼓舞士气来自情绪稳定能力，周期性强化附近队友的暴击表现。"
+weapon_preference = "突击步枪 / SMG"
+mission_preference = "团队推进、高压战斗、连续行动"
+story_tags = ["心理", "社区", "团队", "士气"]

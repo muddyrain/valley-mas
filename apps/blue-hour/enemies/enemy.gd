@@ -48,6 +48,9 @@ var hp_bar: Node3D
 var focus_ring: MeshInstance3D
 var hit_feedback: EnemyHitFeedback
 
+func state_name() -> String:
+	return "INVESTIGATE_NOISE" if state == State.INVESTIGATE else State.keys()[state]
+
 func setup(spec: Resource, offset: float, clock: RefCounted) -> void:
 	data = spec
 	rig = get_node("VisualRig")
@@ -355,6 +358,7 @@ func _resolve_attack(mission: Node3D) -> void:
 	# A committed swing cannot switch victims or hit through newly interposed cover.
 	if is_instance_valid(attack_target) and not attack_target.dead and not attack_target.inside_building:
 		if position.distance_to(attack_target.position) <= data.attack_range and mission.city.line_clear(position, attack_target.position):
-			attack_target.take_damage(attack_damage, mission.invincible, ["infected"])
+			var damage_tags: Array[String] = ["infected"]
+			attack_target.take_damage(attack_damage, mission.invincible, damage_tags)
 			mission.effects_hit(position, attack_target.position, Color("#f4756e"))
 	_cancel_windup()

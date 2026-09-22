@@ -46,7 +46,25 @@ const ALL: Array[Resource] = [
 	preload("res://data/world_assets/PRP_Utility_Pole_A.tres"),
 	preload("res://data/world_assets/PRP_Parking_Sign_A.tres"),
 	preload("res://data/world_assets/PRP_Storefront_AFrame_Sign_A.tres"),
-	preload("res://data/world_assets/PRP_Bicycle_A.tres")
+	preload("res://data/world_assets/PRP_Bicycle_A.tres"),
+	preload("res://data/world_assets/PRP_STREET_001_trash_bin.tres"),
+	preload("res://data/world_assets/PRP_STREET_002_mailbox.tres"),
+	preload("res://data/world_assets/PRP_STREET_003_street_lamp_b.tres"),
+	preload("res://data/world_assets/PRP_STREET_004_traffic_cone.tres"),
+	preload("res://data/world_assets/PRP_STREET_005_road_barrier.tres"),
+	preload("res://data/world_assets/PRP_STREET_006_bus_stop_sign.tres"),
+	preload("res://data/world_assets/PRP_STREET_007_bench.tres"),
+	preload("res://data/world_assets/PRP_STREET_008_vending_machine.tres"),
+	preload("res://data/world_assets/PRP_HOUSE_001_bicycle.tres"),
+	preload("res://data/world_assets/PRP_HOUSE_002_flower_pot_set.tres"),
+	preload("res://data/world_assets/PRP_HOUSE_003_laundry_rack.tres"),
+	preload("res://data/world_assets/PRP_HOUSE_004_patio_table_set.tres"),
+	preload("res://data/world_assets/PRP_HOUSE_005_wood_fence_segment.tres"),
+	preload("res://data/world_assets/PRP_HOUSE_006_package_box_set.tres"),
+	preload("res://data/world_assets/PRP_RUIN_001_garbage_bag_pile.tres"),
+	preload("res://data/world_assets/PRP_RUIN_002_fallen_bicycle.tres"),
+	preload("res://data/world_assets/PRP_RUIN_003_broken_sign.tres"),
+	preload("res://data/world_assets/PRP_RUIN_004_tire_stack.tres")
 ]
 
 static func asset(id: String) -> Resource:

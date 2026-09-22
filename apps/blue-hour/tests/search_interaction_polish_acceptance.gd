@@ -74,6 +74,7 @@ func run() -> void:
 
 	check(world.command_search(house_id, survivor_a), "Selected Survivor A accepts the house search")
 	check(world.command_search(vehicle_id, survivor_b), "Selected Survivor B accepts the vehicle search")
+	check(not hud.toast_panel.visible and not hud.order_label.visible, "Search commands do not create the bottom status banner")
 	var task_a: RefCounted = world.search_tasks[house_id]
 	var task_b: RefCounted = world.search_tasks[vehicle_id]
 	for i: int in range(8):
@@ -81,6 +82,9 @@ func run() -> void:
 		task_a.advance(.1, world)
 		task_b.prepare(.1, world)
 		task_b.advance(.1, world)
+	world.camera_center = (house.spec.entry + vehicle.spec.entry) * .5
+	world.camera_controller.following = false
+	world.camera_controller.apply()
 	hud.refresh()
 	await process_frame
 	var card_a: Control = hud.poi_context.cards[house_id]
@@ -96,6 +100,7 @@ func run() -> void:
 	world.command_recall(house_id)
 	hud.refresh()
 	await process_frame
+	check(not hud.toast_panel.visible and not hud.order_label.visible, "Cancelling a search does not create the bottom status banner")
 	check(not card_a.visible and card_b.visible, "Cancelling A hides only A's card")
 	check(world.search_tasks.has(vehicle_id) and world.task_for(survivor_b) == task_b, "B continues after A cancellation")
 	check(world.command_move(Vector3(0, 0, 14)), "Idle C accepts a ground move during B search")

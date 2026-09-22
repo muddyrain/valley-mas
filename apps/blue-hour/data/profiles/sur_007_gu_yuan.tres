@@ -1,0 +1,19 @@
+[gd_resource type="Resource" script_class="SurvivorProfile" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/survivor_profile.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "SUR_007"
+name = "顾予安"
+age = 0
+occupation = "摄影爱好者 / 观察型学生"
+role = "远程输出"
+personality = "安静、谨慎，习惯先看出口和远处的变化。"
+background = "他习惯站得稍微远一点观察，注意别人容易忽略的移动和异常。"
+before_apocalypse = "灾变前，他以摄影和观察城市为兴趣，练出了稳定的远距离判断。"
+after_apocalypse = "灾变后，他会提前指出出口、远处的移动和不正常的安静区域。"
+trait_explanation = "冷静瞄准来自风险判断能力，强化对远距离感染者的输出。"
+weapon_preference = "远程步枪 / 半自动步枪 / 手枪"
+mission_preference = "远距离警戒、开阔地侦察、远程清理"
+story_tags = ["观察", "摄影", "警戒", "远程"]

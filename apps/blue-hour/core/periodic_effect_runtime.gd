@@ -72,17 +72,19 @@ func advance(delta: float, team: Array[Node3D] = []) -> Array[Dictionary]:
 func select_targets(provider: Node3D, definition: Dictionary, team: Array[Node3D]) -> Array[Node3D]:
 	var filter: String = str(definition.filter)
 	if filter == TARGET_SELF:
-		return [provider]
+		return [provider] if _condition_met(provider, definition) else []
 	var allies: Array[Node3D] = []
 	for candidate: Node3D in team:
 		if candidate == null or candidate == provider or not is_instance_valid(candidate) or _is_inactive(candidate):
 			continue
-		if _within_radius(provider, candidate, float(definition.radius)):
+		if _within_radius(provider, candidate, float(definition.radius)) and _condition_met(candidate, definition):
 			allies.append(candidate)
 	if filter == TARGET_ALLY or filter == TARGET_ALL_TEAM:
-		if filter == TARGET_ALL_TEAM and not _is_inactive(provider):
+		if filter == TARGET_ALL_TEAM and not _is_inactive(provider) and _condition_met(provider, definition):
 			allies.append(provider)
 		return allies
+	if filter == TARGET_LOWEST_HP_ALLY and _condition_met(provider, definition):
+		allies.append(provider)
 	if allies.is_empty():
 		return []
 	if filter == TARGET_NEAREST_ALLY:
@@ -125,9 +127,11 @@ func _definition(trait_data: Resource) -> Dictionary:
 	var duration: float = maxf(0.0, float(trait_data.effect_duration if trait_data.effect_duration > 0.0 else params.get("duration", 0.0)))
 	var radius: float = maxf(0.0, float(trait_data.effect_radius if trait_data.effect_radius > 0.0 else params.get("radius", 0.0)))
 	var filter: String = str(trait_data.effect_target_filter if not str(trait_data.effect_target_filter).is_empty() else params.get("target_filter", ""))
+	var condition: String = str(params.get("condition", ""))
+	var condition_value: float = float(params.get("condition_value", 0.5))
 	if effect_type.is_empty() or interval <= 0.0 or duration <= 0.0 or filter.is_empty():
 		return {}
-	return {"effect_type": effect_type, "interval": interval, "duration": duration, "radius": radius, "filter": filter}
+	return {"effect_type": effect_type, "interval": interval, "duration": duration, "radius": radius, "filter": filter, "condition": condition, "condition_value": condition_value}
 
 func _apply(state: Dictionary, target: Node3D) -> Dictionary:
 	var key: String = "%s:%s:%s" % [state.provider_id, str(target.get_instance_id()), state.definition.effect_type]
@@ -187,6 +191,14 @@ func _hp_ratio(actor: Node3D) -> float:
 	var data: Variant = actor.get("data")
 	var maximum: float = float(data.get("max_hp")) if data != null else 100.0
 	return hp / maxf(0.000001, maximum)
+
+func _condition_met(actor: Node3D, definition: Dictionary) -> bool:
+	var condition: String = str(definition.get("condition", ""))
+	if condition.is_empty():
+		return true
+	if condition == "hp_below_ratio":
+		return _hp_ratio(actor) < float(definition.get("condition_value", 0.5))
+	return false
 
 func _is_inactive(actor: Node3D) -> bool:
 	var dead_value: Variant = actor.get("dead")

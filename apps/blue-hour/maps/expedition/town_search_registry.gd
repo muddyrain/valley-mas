@@ -92,12 +92,13 @@ func _register(id: String, definition: Resource, body: Node3D, search_interactio
 	var anchor := Marker3D.new()
 	root.add_child(anchor)
 	anchor.name = "SearchUIAnchor"
-	var ui_anchor: Dictionary = _resolve_search_ui_anchor(body, search_interaction)
+	var ui_anchor: Dictionary = _resolve_search_ui_anchor(body, search_interaction,
+		primary_entrance, primary_entrance_forward, vehicle)
 	anchor.global_position = ui_anchor.position
 	# The former AABB wireframe was a debug-shaped cue. Discoverability now uses
 	# a small world marker at the authored UI anchor instead.
 	var highlight: MeshInstance3D = null
-	var discover_point: MeshInstance3D = HudMarker.create(root, "world_search_marker", .46, Vector3.ZERO)
+	var discover_point: MeshInstance3D = HudMarker.create(root, "world_discover_marker", .46, Vector3.ZERO)
 	discover_point.name = "SearchDiscoverPoint"
 	discover_point.global_position = anchor.global_position
 	discover_point.hide()
@@ -248,26 +249,21 @@ func snapshot(id: String) -> Dictionary:
 		"is_completed": state.completed, "assigned_survivor_id": state.worker.data.id if state.worker != null else "",
 		"status": site.spec.search_status, "state": state.state}
 
-func _resolve_search_ui_anchor(body: Node3D, fallback: Vector3) -> Dictionary:
+func _resolve_search_ui_anchor(body: Node3D, fallback: Vector3, entrance: Vector3,
+		entrance_forward: Vector3, vehicle: bool) -> Dictionary:
 	var authored: Node3D = body.get_node_or_null("SearchUIAnchor") as Node3D
-	var source: String = "explicit"
 	if authored == null:
 		authored = body.get_node_or_null("Anchors/SearchUIAnchor") as Node3D
-	if authored == null:
-		authored = body.get_node_or_null("Anchors/CenterMarker") as Node3D
-		source = "center_marker" if authored != null else "bounds"
 	if authored != null:
-		if source == "center_marker":
-			var centered_bounds: Dictionary = _world_bounds(body)
-			if bool(centered_bounds.get("valid", false)):
-				var centered_box: AABB = centered_bounds.aabb
-				return {"position": Vector3(authored.global_position.x, centered_box.end.y + 0.6, authored.global_position.z), "source": source}
-		return {"position": authored.global_position + Vector3.UP * 0.5, "source": source}
-	var bounds: Dictionary = _world_bounds(body)
-	if bool(bounds.get("valid", false)):
-		var box: AABB = bounds.aabb
-		return {"position": Vector3(box.position.x + box.size.x * 0.5, box.end.y + 0.8, box.position.z + box.size.z * 0.5), "source": source}
-	return {"position": fallback + Vector3.UP * 2.0, "source": "interaction_fallback"}
+		return {"position": authored.global_position, "source": "explicit"}
+	if vehicle:
+		return {"position": fallback + Vector3.UP * 0.55, "source": "vehicle_interaction"}
+	var outward: Vector3 = entrance_forward
+	outward.y = 0.0
+	if outward.length_squared() > 0.001:
+		return {"position": entrance + outward.normalized() * 0.75 + Vector3.UP * 0.65,
+			"source": "entrance_offset"}
+	return {"position": fallback + Vector3.UP * 0.65, "source": "interaction_fallback"}
 
 func _create_hover_highlight(root: Node3D, body: Node3D, fallback: Vector3) -> MeshInstance3D:
 	var highlight := MeshInstance3D.new()

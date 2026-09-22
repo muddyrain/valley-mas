@@ -13,7 +13,7 @@
 - [x] Survivor marker 移除头像纹理和小地图选中状态，改为 `draw_circle` / `draw_arc` 的中心点 + 外圈；所有存活成员保持相同尺寸和信息等级。
 - [x] 移动状态使用轻微呼吸外圈，搜索状态使用旋转弧线；不改世界角色选择、移动、搜索或 Expedition 输入系统。
 - [x] 更新 Minimap Bridge、Local Follow、HUD Phase 2 测试契约，并新增静止 / 移动 / 搜索三状态截图专项 `tests/minimap_survivor_marker_acceptance.gd`。
-- [ ] Headless 与原生专项、Windows build 和人工截图验收待本轮验证；不推进 Full/Tactical Map、Fog 或其他 HUD 重构。
+- [x] Headless 16 checks / 0 failures，原生 19 checks / 0 failures，三张状态截图已生成；Windows build 仍受既有 Camp UI 门禁阻断，不推进 Full/Tactical Map、Fog 或其他 HUD 重构。
 
 ## 2026-09-21：Map Phase 1.2 — MiniMap Renderer Visual Reconstruction
 
@@ -62,9 +62,9 @@
 
 ## 2026-09-21：SUR_004 陆清禾「应急处理」V1
 
-- [x] 仅通过 TraitData 启用 SUR_004：10 秒间隔、6m、`LOWEST_HP_ALLY`，Lv1～Lv5 为 5/6/7/8/10% 最大生命治疗。
+- [x] 仅通过 TraitData 启用 SUR_004：10 秒间隔、6m、`LOWEST_HP_ALLY`，仅在目标低于 50% 最大生命时触发；最低受伤成员优先，提供者可在自身为最低目标时接受治疗；Lv1～Lv5 为 5/6/7/8/10% 最大生命治疗。
 - [x] 新增独立 `HealEffectHandler`；Periodic Runtime 继续只负责调度和发出事件，Handler 负责满血/死亡排除与 Max HP 上限。
-- [x] SUR_004 专项 16 项、Periodic 13 项、Aura 21 项、Trait Foundation 44 项与 Godot Import 通过。SUR_008 仍未实现。
+- [x] SUR_004 专项 20 项、Periodic 13 项、Aura 21 项、Trait Foundation 44 项与 SUR_008 专项 24 项通过；Godot Import 受当前工作区既有 Minimap 解析错误影响，未宣称全仓通过。
 - [x] SUR_008「鼓舞士气」已接入通用 Periodic Effect → Buff Effect Handler → Crit Modifier：20s 间隔、6m ALL_TEAM、6s 持续、Lv1～Lv5 为 5/7/9/11/13%，支持 Apply/Refresh/Expire 与周期状态 Save/Load；专项测试与相关回归通过。
 
 ## 2026-09-21：Expedition Runtime Performance P02
@@ -176,7 +176,7 @@ Xia / Su 165cm 正式 Runtime、23 骨 `BH_Humanoid_Rig_v1`、canonical T-Pose B
 
 ## 2026-09-19：Expedition Search Gameplay V2
 
-- [x] 复用 SearchTask、集中 4/8/12/18 秒耗时与掉落概率、统一只读生命周期、即时卡片清理、完成/拾取 Toast。
+- [x] 复用 SearchTask、集中 4/8/12/18 秒耗时与掉落概率、统一只读生命周期、即时卡片清理、完成/拾取紧凑 Toast。
 - [x] 最新专项 Headless 67 项、原生 72 项通过；住宅和车辆正式时长完整流程、并行隔离、Command V1 回归通过。
 - [x] Release 单独导出成功；独立 EXE Headless/原生 Expedition 启动，以及内嵌包住宅/车辆完整搜索、奖励与卡片验证通过。
 - [ ] 完整 build 仍被既有 Camp UI 测试阻断；退出时旧 ObjectDB 泄漏警告仍保留。数值、缺口、全部文件与失败回归见 [Search Gameplay V2 报告](EXPEDITION_SEARCH_GAMEPLAY.md)。
@@ -1332,3 +1332,39 @@ M03: TECHNICALLY COMPLETE；Town Structure: FROZEN。停止于人工视觉审核
 ## Survivor Trait Foundation（2026-09-19）
 
 已接入SUR_001/SUR_002：Definition → Trait Runtime → Search/Reward Hook，等级复用roster.level 1～5。资料以[用户数据表](SURVIVOR_DATA_TABLE.md)为准；推荐武器仅标签。Trait44、搜索111、Town13、原生Camp/任务选择/Expedition28、公共动画495项通过。Su各100,000样本命中率7.932%/16.018%。冻结表现与2.8m/s不变。旧effect_system仍有时钟断言/缺失站点错误，未扩展修复，不声明全仓全绿。详见[报告](SURVIVOR_TRAIT_FOUNDATION_REPORT.md)。SUR_003/005/007/009/010/012 已在后续 Phase A 接入；其余四项保持数据预留。
+
+## Survivor Profile Data V1（2026-09-22）
+
+- [x] 新增独立 `SurvivorProfile` Resource 与 12 份 `SUR_001`～`SUR_012` 档案数据；叙事资料与 Trait / Gameplay 分离。
+- [x] Catalog 校验 Profile 唯一 ID 与 `SurvivorDefinition.survivor_id` 关联；CharacterRegistry 提供按旧模板 ID 或 `SUR_###` 查询的只读接口。
+- [x] 新增 Profile 数据专项 Save/Load 回归测试；未修改 GLB、Rig、Animation、Weapon、Trait、Aura、Periodic 或 HUD。
+- [x] Godot headless import and focused Profile verification passed: 91 checks / 0 failures；完整套件在既有 `camp_departure` Camp UI 空节点断言处停止，未归因于 Profile 层。
+
+详见 [Survivor Profile Data V1 报告](SURVIVOR_PROFILE_DATA_REPORT.md)。
+
+## Survivor Recruitment & Roster Foundation V1（2026-09-22）
+
+- [x] 新增 `SurvivorRosterManager` 与 `LOCKED / DISCOVERED / RECRUITED` 状态；默认仅 `SUR_001`、`SUR_002` 已招募，其余 10 人锁定。
+- [x] 提供全部、已发现、已招募、可出战查询，以及发现/招募状态转换；支持稳定 `SUR_###` 与现有模板 ID 查询。
+- [x] 将 `survivor_states` 作为 v5 存档可选字段接入 Campaign；旧存档自动使用默认状态并同步已有出战成员，不改变 XP、Trait、Progression 或 Mission 数据。
+- [x] 招募专项 17 项、Save Catalog Compatibility 9 项、Progression 29 项、Character System 与 Godot Headless Import 通过。
+
+详见 [Survivor Recruitment & Roster Foundation 报告](SURVIVOR_RECRUITMENT_ROSTER_REPORT.md)。
+
+## Survivor Camp Roster Integration V1（2026-09-22）
+
+- [x] Camp M04 通过 `Campaign.roster_manager()` 动态读取 Survivor ownership；不再在 HUD 中固定角色数组。
+- [x] 已招募角色显示 Portrait、Name、Level、Trait；DISCOVERED 显示“已发现 · 等待救援”；LOCKED 显示“未知幸存者”并隐藏完整资料。
+- [x] 数量显示统一为 `RECRUITED / 12`，支持招募后刷新与 Save/Load 后恢复。
+- [x] 专项 Camp roster 集成测试 0 failures；未修改 SurvivorDefinition、Trait/Aura/Periodic、XP/Level、角色资源或动画。
+
+详见 [Survivor Camp Roster Integration 报告](SURVIVOR_CAMP_ROSTER_INTEGRATION_REPORT.md)。
+## 2026-09-22：蓝时归航 Expedition Map Phase 1 + Phase 2
+
+- [x] MiniMap 正式化：移除地图名、版本、Seed、Block ID 和 Debug Label 绘制路径；正式地图只保留地图几何、幸存者、POI、蓝时号和已发现地点标记。
+- [x] 幸存者标记改为 Godot 绘制的圆环 + 中心点，支持静止、移动呼吸和搜索状态；统一样式，无头像纹理和 selected 状态。
+- [x] Medium Town Arrival 改为道路网关 T 形交叉口候选，并为每个候选提供确定性的街边停车支持面；保留 Seed 驱动的 Block / Building / POI 管线。
+- [x] 五个固定 Seed 结构验收通过：道路、街区、住宅/商业/工业分区、建筑密度、入口朝向、Arrival 建筑/停车/装饰邻近性。
+- [x] 原生 MiniMap 五 Seed 对比截图与幸存者三状态截图已生成，见 [Phase 1 + 2 report](MAP_PHASE_1_2_FORMAL_REPORT.md)。
+- [x] `run.ps1` 已接入结构验收与原生五 Seed capture。
+- [ ] 完整 Windows build 仍需单独通过既有 Camp UI 门禁后才能宣称全量构建完成；本轮未修改 Camp、战斗、角色控制或摄像机系统。

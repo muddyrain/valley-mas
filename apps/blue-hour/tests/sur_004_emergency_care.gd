@@ -40,6 +40,7 @@ func run() -> void:
 	check(definition.trait_id == "emergency_response", "SUR_004 definition uses emergency_response")
 	check(base_trait.modifier_hook == "periodic_effect", "SUR_004 uses Periodic Effect hook")
 	check(float(base_trait.params.get("interval", 0.0)) == 10.0 and float(base_trait.params.get("radius", 0.0)) == 6.0, "SUR_004 interval and radius are data-driven")
+	check(str(base_trait.params.get("condition", "")) == "hp_below_ratio" and is_equal_approx(float(base_trait.params.get("condition_value", 0.0)), 0.5), "SUR_004 below-half-health condition is data-driven")
 	check(base_trait.levels == PackedFloat32Array([0.05, 0.06, 0.07, 0.08, 0.10]), "SUR_004 level table is exact")
 
 	var provider := _actor(definition, Vector3.ZERO, 100.0)
@@ -48,9 +49,11 @@ func run() -> void:
 	var dead := _actor(definition, Vector3(0, 0, 1), 10.0, true)
 	var far := _actor(definition, Vector3(0, 0, 10), 1.0)
 	var runtime := Periodic.new()
+	var applied_events: int = 0
 	runtime.effect_applied.connect(func(event: Dictionary) -> void:
 		if event.effect_type == "heal":
-			for target: Node3D in [low, high, dead]:
+			applied_events += 1
+			for target: Node3D in [provider, low, high, dead]:
 				if str(target.get_instance_id()) == str(event.target_id):
 					HealHandler.apply(target, float(event.value))
 	)
@@ -61,6 +64,17 @@ func run() -> void:
 	near(high.hp, 60.0, "SUR_004 leaves higher HP ally unchanged")
 	near(dead.hp, 10.0, "SUR_004 excludes dead ally")
 	near(far.hp, 1.0, "SUR_004 excludes allies outside 6m")
+	low.hp = 60.0
+	high.hp = 70.0
+	provider.hp = 40.0
+	runtime.advance(10.0, [provider, low, high, dead, far])
+	near(provider.hp, 45.0, "SUR_004 can heal itself when it is the lowest damaged team member")
+	low.hp = 80.0
+	high.hp = 90.0
+	provider.hp = 80.0
+	var applied_before_no_target: int = applied_events
+	runtime.advance(10.0, [provider, low, high, dead, far])
+	check(applied_events == applied_before_no_target, "SUR_004 does not trigger when every target is at or above half health")
 	var cap := _actor(definition, Vector3.ZERO, 98.0)
 	near(HealHandler.apply(cap, 0.10).amount, 2.0, "Lv5 heal amount is capped at missing HP")
 	near(cap.hp, 100.0, "Heal never exceeds Max HP")

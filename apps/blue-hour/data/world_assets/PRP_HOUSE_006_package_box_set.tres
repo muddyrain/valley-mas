@@ -1,0 +1,12 @@
+[gd_resource type="Resource" format=3]
+[ext_resource type="PackedScene" path="res://assets/world/props/street_prop_pack_v1/PRP_HOUSE_006_package_box_set.glb" id="1"]
+[ext_resource type="Script" path="res://data/world_asset_data.gd" id="2"]
+[resource]
+script = ExtResource("2")
+id = "PRP_HOUSE_006_package_box_set"
+scene = ExtResource("1")
+category = "house"
+footprint = Vector2(1.1, 0.7)
+bounding_size = Vector3(1.105, 0.48, 0.5)
+searchable = false
+environment_tags = PackedStringArray("RESIDENTIAL", "COMMERCIAL")

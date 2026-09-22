@@ -1,0 +1,19 @@
+[gd_resource type="Resource" script_class="SurvivorProfile" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/survivor_profile.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "SUR_004"
+name = "陆清禾"
+age = 0
+occupation = "急救志愿者 / 应急培训成员"
+role = "医疗支援"
+personality = "冷静、耐心，先处理最紧急的问题。"
+background = "她参加过长期基础急救培训，也经常参与大型活动的志愿保障。"
+before_apocalypse = "灾变前，她在活动现场负责急救与应急保障，熟悉止血、观察和撤离判断。"
+after_apocalypse = "灾变后，她在队伍中照看伤员，提醒大家何时处理伤口、休息或撤退。"
+trait_explanation = "应急处理来自她的现场救护经验，周期性帮助附近生命值最低的队友。"
+weapon_preference = "手枪 / SMG"
+mission_preference = "危险区域、救援行动、长途撤离"
+story_tags = ["医疗", "急救", "志愿者", "支援"]

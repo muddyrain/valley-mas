@@ -14,7 +14,7 @@
   - 在 `SearchActiveCard` 右上角增加执行者短标识（姓名前两个字）。
   - 保留完整姓名 tooltip，便于多幸存者并行搜索时确认任务归属。
   - 保留现有卡片素材、进度条、取消按钮和尺寸。
-- `tests/search_interaction_polish_v3.gd`
+- `tests/search_interaction_polish_acceptance.gd`
   - 新增 V3 场景 fixture，覆盖双人并行搜索、切换幸存者、独立取消、地面移动和 Hover 提示。
 - `run.ps1`
   - 将 V3 headless 测试接入 `test` 模式。
@@ -49,9 +49,9 @@
 
 本轮 native capture 输出：
 
-- [双人并行搜索](../test-output/search-interaction-polish-v3/parallel-search.png)
-- [取消 A 后 B 继续](../test-output/search-interaction-polish-v3/cancel-a-b-continues.png)
-- [Hover 搜索提示](../test-output/search-interaction-polish-v3/hover-search-prompt.png)
+- [双人并行搜索](../test-output/search-interaction-polish-acceptance/parallel-search.png)
+- [取消 A 后 B 继续](../test-output/search-interaction-polish-acceptance/cancel-a-b-continues.png)
+- [Hover 搜索提示](../test-output/search-interaction-polish-acceptance/hover-search-prompt.png)
 
 此前完整搜索流程截图也可复用：
 

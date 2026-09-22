@@ -1,0 +1,12 @@
+[gd_resource type="Resource" format=3]
+[ext_resource type="PackedScene" path="res://assets/world/props/street_prop_pack_v1/PRP_STREET_004_traffic_cone.glb" id="1"]
+[ext_resource type="Script" path="res://data/world_asset_data.gd" id="2"]
+[resource]
+script = ExtResource("2")
+id = "PRP_STREET_004_traffic_cone"
+scene = ExtResource("1")
+category = "street"
+footprint = Vector2(0.48, 0.48)
+bounding_size = Vector3(0.44, 0.64, 0.44)
+searchable = false
+environment_tags = PackedStringArray("COMMERCIAL", "INDUSTRIAL")

@@ -183,6 +183,15 @@ func verify_registry(mission: Node3D, seed_value: int) -> void:
 		var value: Dictionary = registry.snapshot(id)
 		var definition: Resource = Assets.asset(value.source_definition_id)
 		check(definition.searchable and Registry.Loot.PROFILES.has(value.loot_profile), "Definition-backed profile")
+		var anchor: Vector3 = value.search_ui_anchor
+		if value.search_type == "vehicle":
+			check(Vector2(anchor.x, anchor.z).distance_to(Vector2(value.search_interaction_point.x, value.search_interaction_point.z)) <= .05,
+				"Vehicle SearchUIAnchor stays at its interaction point")
+		else:
+			var entrance_distance: float = Vector2(anchor.x, anchor.z).distance_to(Vector2(value.entrance_point.x, value.entrance_point.z))
+			check(entrance_distance >= .5 and entrance_distance <= 1.0,
+				"Building SearchUIAnchor stays 0.5-1m from its entrance")
+		check(anchor.y - value.entrance_point.y <= .7, "SearchUIAnchor remains low near the entrance")
 		if value.status == Registry.RESOLVED_REACHABLE:
 			available += 1
 			check(mission.city.navigation.point_clear(value.interaction_point), "Interaction clears all inflated blockers")

@@ -1,0 +1,19 @@
+[gd_resource type="Resource" script_class="SurvivorProfile" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/survivor_profile.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "SUR_011"
+name = "贺临川"
+age = 0
+occupation = "户外领队 / 应急志愿者"
+role = "团队保护"
+personality = "稳重、负责，持续关注路线、天气和每个人的状态。"
+background = "他习惯照看一个完整团队，判断什么时候继续走，什么时候应该停下来。"
+before_apocalypse = "灾变前，他带领户外队伍并参与应急志愿工作，积累了路线与救援经验。"
+after_apocalypse = "灾变后，他把队伍安全放在首位，尽量不让任何人掉队。"
+trait_explanation = "稳住阵脚来自救援经验，降低附近幸存者受到的伤害。"
+weapon_preference = "突击步枪 / 霰弹枪"
+mission_preference = "团队护送、长途撤离、危险路线"
+story_tags = ["领队", "救援", "防护", "路线"]

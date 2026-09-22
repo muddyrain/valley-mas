@@ -1,0 +1,19 @@
+[gd_resource type="Resource" script_class="SurvivorProfile" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/survivor_profile.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "SUR_009"
+name = "周野"
+age = 0
+occupation = "篮球社 / 户外运动爱好者"
+role = "生存防御"
+personality = "精力旺盛、可靠，愿意先承担最需要体力的部分。"
+background = "跑、跳、搬东西、翻墙，只要需要体力的事情，他通常不会让别人先上。"
+before_apocalypse = "灾变前，他在篮球社和户外活动中保持高强度训练。"
+after_apocalypse = "灾变后，他用耐力和身体素质为队伍承担前排压力与搬运任务。"
+trait_explanation = "强健体魄来自长期身体训练，提高最大生命值。"
+weapon_preference = "霰弹枪 / 近战 / SMG"
+mission_preference = "前排突破、重物搬运、危险区域"
+story_tags = ["体能", "篮球", "前排", "生存"]

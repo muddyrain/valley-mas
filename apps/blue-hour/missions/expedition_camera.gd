@@ -1,11 +1,11 @@
 extends Node
 ## Presentation around the existing mission camera; manual pan always wins over following.
 
-const DEFAULT_SIZE: float = 25.0
+const DEFAULT_SIZE: float = 23.0
 const MIN_SIZE: float = 20.0
 const MAX_SIZE: float = 35.0
-const OFFSET := Vector3(34, 42, 43)
-const LOOK_AHEAD := Vector3(0, 0, -4)
+const OFFSET := Vector3(34, 40, 43)
+const LOOK_AHEAD := Vector3(0, 0, -4.8)
 var following: bool = true
 var mission: Node3D
 

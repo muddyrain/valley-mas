@@ -1,0 +1,19 @@
+[gd_resource type="Resource" script_class="SurvivorProfile" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/survivor_profile.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "SUR_006"
+name = "唐栀"
+age = 0
+occupation = "运动社团成员 / 校园活动组织者"
+role = "团队机动"
+personality = "外向、直接，很难安静太久，擅长带动周围的人。"
+background = "她习惯一边喊一边跑，也很容易和陌生人熟起来。"
+before_apocalypse = "灾变前，她组织校园活动并参加运动社团，熟悉调动人群和安排路线。"
+after_apocalypse = "灾变后，她用自己的节奏让队伍更快重新集结并离开危险区域。"
+trait_explanation = "带起节奏来自路线规划与团队动员能力，提高附近幸存者的移动效率。"
+weapon_preference = "SMG / 霰弹枪"
+mission_preference = "多人搜刮、队伍集结、撤离路线"
+story_tags = ["团队", "运动", "机动", "组织"]

@@ -1,0 +1,12 @@
+[gd_resource type="Resource" format=3]
+[ext_resource type="PackedScene" path="res://assets/world/props/street_prop_pack_v1/PRP_STREET_005_road_barrier.glb" id="1"]
+[ext_resource type="Script" path="res://data/world_asset_data.gd" id="2"]
+[resource]
+script = ExtResource("2")
+id = "PRP_STREET_005_road_barrier"
+scene = ExtResource("1")
+category = "street"
+footprint = Vector2(2.25, 0.55)
+bounding_size = Vector3(2.1, 0.81, 0.35)
+searchable = false
+environment_tags = PackedStringArray("INDUSTRIAL", "COMMERCIAL")

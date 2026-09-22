@@ -26,7 +26,7 @@ func run() -> void:
 	mission.set_physics_process(false)
 	check(ProjectSettings.get_setting("display/window/size/window_width_override") == 1600, "Default window width is 1600")
 	check(ProjectSettings.get_setting("display/window/size/window_height_override") == 900, "Default window height is 900")
-	check(mission.camera.size == 25, "Default camera makes the squad readable without changing its scale")
+	check(mission.camera.size == 23, "Default camera makes the squad readable without changing its scale")
 	check(mission.camera_center.distance_to(mission.squad_center()) < 10, "Arrival camera frames the squad instead of the map origin")
 	check(mission.camera.projection == Camera3D.PROJECTION_ORTHOGONAL, "Existing 3/4 projection retained")
 	check(mission.catalog.map.base_seed == 20260912, "Same formal base map seed")

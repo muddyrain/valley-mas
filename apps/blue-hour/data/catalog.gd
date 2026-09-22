@@ -14,6 +14,20 @@ var survivors: Array[Resource] = [
 	preload("res://data/survivors/he_linchuan.tres"),
 	preload("res://data/survivors/song_shiyu.tres")
 ]
+var profiles: Array[Resource] = [
+	preload("res://data/profiles/sur_001_xia_zhiyao.tres"),
+	preload("res://data/profiles/sur_002_su_wanxing.tres"),
+	preload("res://data/profiles/sur_003_lin_jianyue.tres"),
+	preload("res://data/profiles/sur_004_lu_qinghe.tres"),
+	preload("res://data/profiles/sur_005_shen_yanchuan.tres"),
+	preload("res://data/profiles/sur_006_tang_zhi.tres"),
+	preload("res://data/profiles/sur_007_gu_yuan.tres"),
+	preload("res://data/profiles/sur_008_cheng_mo.tres"),
+	preload("res://data/profiles/sur_009_zhou_ye.tres"),
+	preload("res://data/profiles/sur_010_xu_zhaoning.tres"),
+	preload("res://data/profiles/sur_011_he_linchuan.tres"),
+	preload("res://data/profiles/sur_012_song_shiyu.tres")
+]
 var traits: Array[Resource] = [
 	preload("res://data/traits/search_instinct.tres"),
 	preload("res://data/traits/resource_efficiency.tres"),
@@ -75,7 +89,7 @@ func by_id(collection: Array[Resource], id: String) -> Resource:
 func validate() -> Array[String]:
 	var errors: Array[String] = []
 	errors.append_array(map.encounter.validation_errors())
-	for collection in [survivors, traits, weapons, enemies, affixes, specializations, passives, powers, today_actions]:
+	for collection in [survivors, profiles, traits, weapons, enemies, affixes, specializations, passives, powers, today_actions]:
 		var ids: Array[String] = []
 		for entry in collection:
 			if entry.id.is_empty() or entry.id in ids:
@@ -87,6 +101,13 @@ func validate() -> Array[String]:
 		if survivor is SurvivorDefinition:
 			if survivor.survivor_id.is_empty() or survivor.trait_definition != by_id(traits, survivor.trait_id):
 				errors.append("Survivor definition/trait mismatch: " + survivor.id)
+			elif by_id(profiles, survivor.survivor_id) == null:
+				errors.append("Survivor definition/profile mismatch: " + survivor.id)
+	for profile: Resource in profiles:
+		if not profile is SurvivorProfile:
+			errors.append("Invalid survivor profile resource: " + profile.resource_path)
+		else:
+			errors.append_array(profile.validation_errors())
 	for definition: Resource in traits:
 		if definition.modifier_hook.is_empty():
 			continue

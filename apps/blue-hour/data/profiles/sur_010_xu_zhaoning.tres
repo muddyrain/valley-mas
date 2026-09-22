@@ -1,0 +1,19 @@
+[gd_resource type="Resource" script_class="SurvivorProfile" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/survivor_profile.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "SUR_010"
+name = "许昭宁"
+age = 0
+occupation = "商品企划 / 买手店兼职"
+role = "高价值搜寻"
+personality = "果断、挑剔，能在相似物品中快速分辨真正的价值。"
+background = "她擅长在一堆看起来差不多的东西里判断哪个值得留下。"
+before_apocalypse = "灾变前，她在商品企划和买手店工作中积累了筛选与价值判断经验。"
+after_apocalypse = "灾变后，她帮助队伍在负重有限时优先带走高价值物资。"
+trait_explanation = "价值判断来自对物资价值的识别能力，提高稀有及以上战利品的出现权重。"
+weapon_preference = "手枪 / 突击步枪"
+mission_preference = "高价值搜寻、商店探索、稀缺物资路线"
+story_tags = ["价值", "商品", "搜刮", "判断"]

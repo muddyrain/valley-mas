@@ -88,8 +88,13 @@ func register_site(spec: Dictionary, body: Node3D, vehicle: bool) -> void:
 	var anchor := Marker3D.new()
 	anchor.name = "SearchUIAnchor"
 	body.get_node("Anchors").add_child(anchor)
-	anchor.global_position = entry + Vector3.UP * (1.8 if vehicle else 2.0)
-	sites[spec.id] = {"spec": spec, "progress": 0.0, "searched": false, "discovered": false, "ring": ring, "body": body, "vehicle": vehicle, "search_anchor": anchor}
+	anchor.global_position = entry + Vector3.UP * (0.55 if vehicle else 0.65)
+	var discover_point: MeshInstance3D = HudMarker.create(root, "world_discover_marker", .46, anchor.global_position)
+	discover_point.name = "SearchDiscoverPoint"
+	discover_point.hide()
+	sites[spec.id] = {"spec": spec, "progress": 0.0, "searched": false, "discovered": false,
+		"ring": ring, "body": body, "vehicle": vehicle, "search_anchor": anchor,
+		"search_ui_anchor": anchor, "discover_point": discover_point}
 
 func _build_bus() -> void:
 	var pos: Vector3 = data.bus_position + Vector3(0, 0, 3.7)

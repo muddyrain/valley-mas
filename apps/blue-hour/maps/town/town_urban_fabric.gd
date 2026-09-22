@@ -22,7 +22,7 @@ static func populate(layout: Dictionary, mission_type: String, seed_value: int) 
 			_row(town, block, frontage, row.category, row.count, row.gap, rng, row.get("trim_end", 0.0), row.get("trim_start", 0.0))
 			if not town.ok:
 				return town
-		_internal_spaces(block)
+		_internal_spaces(town, block)
 	town.composition = preload("res://maps/town/town_main_street.gd").metrics(town)
 	LandUse.finish(town, layout.arrivals, rng)
 	_orient_entrance_data(town)
@@ -98,9 +98,48 @@ static func _row(town: Dictionary, block: Dictionary, edge: Dictionary, category
 			town.gaps[category].append(gap)
 		cursor += definition.footprint.x + gap
 
-static func _internal_spaces(block: Dictionary) -> void:
+static func _internal_spaces(town: Dictionary, block: Dictionary) -> void:
+	# Commercial blocks reserve their largest building-free interior piece as parking;
+	# the remaining pieces stay rear-access surfaces. This keeps parking inside the
+	# generated block and gives the Arrival scorer a real frontage support surface.
+	if block.land_use_type == "COMMERCIAL_CORE":
+		var free: Array[PackedVector2Array] = [block.polygon]
+		for site: Dictionary in town.buildings:
+			if site.block_id != block.id:
+				continue
+			free = _subtract(free, LandUse.rect_polygon(site.bounds.grow(0.9)))
+		if free.is_empty():
+			block.spaces.append({"kind": block.space_use, "polygon": block.polygon, "bounds": block.bounds})
+			return
+		var parking_index := -1
+		var parking_area := 0.0
+		for index: int in free.size():
+			var candidate_area := LandUse.area(free[index])
+			if candidate_area > parking_area:
+				parking_area = candidate_area
+				parking_index = index
+		for index: int in free.size():
+			var polygon := free[index]
+			if LandUse.area(polygon) < 0.01:
+				continue
+			var kind: String = "parking" if index == parking_index and parking_area >= 40.0 else block.space_use
+			var bounds := _bounds(polygon)
+			block.spaces.append({"kind": kind, "polygon": polygon, "bounds": bounds})
+		return
 	# Land-use surfaces retain the exact boundary, including rear recesses and terminal caps.
 	block.spaces.append({"kind": block.space_use, "polygon": block.polygon, "bounds": block.bounds})
+
+static func _subtract(pieces: Array[PackedVector2Array], polygon: PackedVector2Array) -> Array[PackedVector2Array]:
+	var result: Array[PackedVector2Array] = []
+	for piece: PackedVector2Array in pieces:
+		result.append_array(Geometry2D.clip_polygons(piece, polygon))
+	return result
+
+static func _bounds(polygon: PackedVector2Array) -> Rect2:
+	var bounds := Rect2(polygon[0], Vector2.ZERO)
+	for point: Vector2 in polygon:
+		bounds = bounds.expand(point)
+	return bounds
 
 static func _orient_entrance_data(town: Dictionary) -> void:
 	var turns: int = int(town.get("orientation_quarters", 0))

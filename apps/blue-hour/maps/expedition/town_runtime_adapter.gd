@@ -11,6 +11,8 @@ const PolishView = preload("res://maps/town/environment/town_polish_view.gd")
 const Targeted = preload("res://maps/town/environment/town_targeted_props.gd")
 const RoadsidePass = preload("res://maps/town/environment/town_roadside_visual_pass.gd")
 const RoadsideView = preload("res://maps/town/environment/town_roadside_view.gd")
+const DressingPass = preload("res://maps/town/environment/town_urban_dressing_layer.gd")
+const DressingView = preload("res://maps/town/environment/town_urban_dressing_view.gd")
 const Geometry = preload("res://maps/town/environment/environment_geometry.gd")
 const WorldCatalog = preload("res://data/world_asset_catalog.gd")
 const NOT_AVAILABLE_YET: String = "NOT_AVAILABLE_YET"
@@ -33,7 +35,7 @@ func build_runtime(mission_type: String, map_seed: int, base_map: Resource) -> b
 	var environment: Dictionary = _generate_environment(town)
 	_instantiate_town(town)
 	var environment_root := _instantiate_environment(town, environment)
-	_finish_runtime(town, environment.data, environment.roadside, environment_root, map_seed, base_map)
+	_finish_runtime(town, environment.data, environment.roadside, environment.dressing, environment_root, map_seed, base_map)
 	return true
 
 func build_runtime_staged(mission_type: String, map_seed: int, base_map: Resource, profile: RefCounted) -> bool:
@@ -46,16 +48,18 @@ func build_runtime_staged(mission_type: String, map_seed: int, base_map: Resourc
 	var environment_data: Dictionary = _generate_environment_data(town)
 	await _loading_frame()
 	var roadside: Dictionary = _generate_roadside(town, environment_data)
-	load_profile.stages["environment_generate"] = load_profile.stages.get("environment_data_generate", 0.0) + load_profile.stages.get("environment_roadside_generate", 0.0)
+	var dressing: Dictionary = _generate_dressing(town, environment_data)
+	load_profile.stages["environment_generate"] = load_profile.stages.get("environment_data_generate", 0.0) + load_profile.stages.get("environment_roadside_generate", 0.0) + load_profile.stages.get("environment_dressing_generate", 0.0)
 	await _loading_frame()
 	_instantiate_town(town)
 	await _loading_frame()
 	var environment_root := _instantiate_environment_base(environment_data)
 	await _loading_frame()
 	_instantiate_roadside(town, roadside)
-	load_profile.stages["environment_placement"] = load_profile.stages.get("environment_instance", 0.0) + load_profile.stages.get("roadside_instance", 0.0)
+	_instantiate_dressing(town, dressing)
+	load_profile.stages["environment_placement"] = load_profile.stages.get("environment_instance", 0.0) + load_profile.stages.get("roadside_instance", 0.0) + load_profile.stages.get("dressing_instance", 0.0)
 	await _loading_frame()
-	_finish_runtime(town, environment_data, roadside, environment_root, map_seed, base_map)
+	_finish_runtime(town, environment_data, roadside, dressing, environment_root, map_seed, base_map)
 	return true
 
 func _loading_frame() -> void:
@@ -74,9 +78,10 @@ func _generate_environment(town: Dictionary) -> Dictionary:
 	var started: int = Time.get_ticks_usec()
 	var environment_data: Dictionary = _generate_environment_data(town)
 	var roadside: Dictionary = _generate_roadside(town, environment_data)
+	var dressing: Dictionary = _generate_dressing(town, environment_data)
 	if load_profile != null:
 		load_profile.measure("environment_generate", started)
-	return {"data": environment_data, "roadside": roadside}
+	return {"data": environment_data, "roadside": roadside, "dressing": dressing}
 
 func _generate_environment_data(town: Dictionary) -> Dictionary:
 	var started: int = Time.get_ticks_usec()
@@ -92,6 +97,13 @@ func _generate_roadside(town: Dictionary, environment_data: Dictionary) -> Dicti
 		load_profile.measure("environment_roadside_generate", started)
 	return result
 
+func _generate_dressing(town: Dictionary, environment_data: Dictionary) -> Dictionary:
+	var started: int = Time.get_ticks_usec()
+	var result: Dictionary = DressingPass.new().generate(town, environment_data)
+	if load_profile != null:
+		load_profile.measure("environment_dressing_generate", started)
+	return result
+
 func _instantiate_town(town: Dictionary) -> void:
 	var started := Time.get_ticks_usec()
 	UrbanView.build(self, town)
@@ -102,6 +114,7 @@ func _instantiate_environment(town: Dictionary, environment: Dictionary) -> Node
 	var started := Time.get_ticks_usec()
 	var environment_root: Node3D = _instantiate_environment_base(environment.data)
 	_instantiate_roadside(town, environment.roadside)
+	_instantiate_dressing(town, environment.dressing)
 	if load_profile != null:
 		load_profile.measure("environment_placement", started)
 	return environment_root
@@ -119,7 +132,13 @@ func _instantiate_roadside(town: Dictionary, roadside: Dictionary) -> void:
 	if load_profile != null:
 		load_profile.measure("roadside_instance", started)
 
-func _finish_runtime(town: Dictionary, environment_data: Dictionary, roadside: Dictionary, environment_root: Node3D, map_seed: int, base_map: Resource) -> void:
+func _instantiate_dressing(town: Dictionary, dressing: Dictionary) -> void:
+	var started: int = Time.get_ticks_usec()
+	DressingView.build(self, town, dressing)
+	if load_profile != null:
+		load_profile.measure("dressing_instance", started)
+
+func _finish_runtime(town: Dictionary, environment_data: Dictionary, roadside: Dictionary, dressing: Dictionary, environment_root: Node3D, map_seed: int, base_map: Resource) -> void:
 	var started := Time.get_ticks_usec()
 	navigation.ground.build(self)
 	bus_root = get_node("BusArrival")
@@ -150,7 +169,7 @@ func _finish_runtime(town: Dictionary, environment_data: Dictionary, roadside: D
 	for road: Dictionary in town.roads:
 		road_bounds.append(road.bounds)
 	var poi_definition: Resource = WorldCatalog.asset(town.poi.asset)
-	runtime_data = {"provider": "MEDIUM_TOWN_V1", "seed": map_seed, "town_bounds": bounds, "arrival_point": arrival_point, "arrival_forward": arrival_forward, "arrival_exit": arrival_exit, "mission_poi": project_to_ground(town.poi.entry), "mission_poi_id": town.poi.id, "mission_poi_type": poi_definition.poi_type if not poi_definition.poi_type.is_empty() else poi_definition.category, "extraction_point": project_to_ground(town.extraction.position), "building_entries": entries, "building_search_points": search_points, "vehicle_search_points": NOT_AVAILABLE_YET, "enemy_spawn_zones": NOT_AVAILABLE_YET, "road_bounds": road_bounds, "walkable_hint_bounds": road_bounds, "environment_root": environment_root, "runtime_root": self, "world_root": self, "navigation_available": false, "gameplay_available": false, "movement_status": "MOVEMENT BLOCKED BY E01 NAVIGATION INTEGRATION", "source_signatures": {"town": var_to_str(town).sha256_text(), "m02": var_to_str(environment_data).sha256_text(), "m03": var_to_str(roadside).sha256_text()}, "m03_statistics": roadside.statistics, "environment_instance_count": environment_data.instances.size()}
+	runtime_data = {"provider": "MEDIUM_TOWN_V1", "seed": map_seed, "town_bounds": bounds, "arrival_point": arrival_point, "arrival_forward": arrival_forward, "arrival_exit": arrival_exit, "mission_poi": project_to_ground(town.poi.entry), "mission_poi_id": town.poi.id, "mission_poi_type": poi_definition.poi_type if not poi_definition.poi_type.is_empty() else poi_definition.category, "extraction_point": project_to_ground(town.extraction.position), "building_entries": entries, "building_search_points": search_points, "vehicle_search_points": NOT_AVAILABLE_YET, "enemy_spawn_zones": NOT_AVAILABLE_YET, "road_bounds": road_bounds, "walkable_hint_bounds": road_bounds, "environment_root": environment_root, "runtime_root": self, "world_root": self, "navigation_available": false, "gameplay_available": false, "movement_status": "MOVEMENT BLOCKED BY E01 NAVIGATION INTEGRATION", "source_signatures": {"town": var_to_str(town).sha256_text(), "m02": var_to_str(environment_data).sha256_text(), "m03": var_to_str(roadside).sha256_text(), "m03a": var_to_str(dressing).sha256_text()}, "m03_statistics": roadside.statistics, "m03a_statistics": dressing.get("by_zone", {}), "environment_instance_count": environment_data.instances.size(), "urban_dressing_instance_count": dressing.get("instances", []).size()}
 	get_node("MissionPOI").position = runtime_data.mission_poi
 	get_node("BusArrivalPoint").position = arrival_point
 	data = base_map.duplicate(true)

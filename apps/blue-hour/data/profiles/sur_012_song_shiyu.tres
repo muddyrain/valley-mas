@@ -1,0 +1,19 @@
+[gd_resource type="Resource" script_class="SurvivorProfile" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/survivor_profile.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "SUR_012"
+name = "宋时雨"
+age = 0
+occupation = "活动统筹 / 会务协调"
+role = "技术支援"
+personality = "冷静、有条理，越混乱越会先重新排列顺序。"
+background = "她习惯在混乱的时间表、人群和突发情况之间重新找到节奏。"
+before_apocalypse = "灾变前，她负责活动统筹和会务协调，擅长安排流程与处理突发变化。"
+after_apocalypse = "灾变后，她帮助队伍把复杂行动拆成清晰步骤，减少等待和慌乱。"
+trait_explanation = "从容不迫来自设备技术与流程协调能力，降低全队特殊技能冷却时间。"
+weapon_preference = "手枪 / 步枪"
+mission_preference = "复杂任务、技能循环、连续行动"
+story_tags = ["统筹", "协调", "技术", "冷静"]

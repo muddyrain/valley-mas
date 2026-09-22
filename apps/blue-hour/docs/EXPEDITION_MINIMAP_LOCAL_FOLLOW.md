@@ -28,7 +28,7 @@
 | E01.5 Runtime Bridge 回归 | **1,319 checks / 0 failures**；4101–4104 数据逐项对照冻结 Generator、种子切换、Legacy、统一坐标和保留的 overview 投影 |
 | Local Follow 专项 | **1,810 checks / 0 failures**；四种子固定 70×70m、镜头/选择独立、等尺寸三人标记、成员死亡/离队/分散、边缘方向、已知/未知地点、移动滚动及静态缓存 |
 | 原生选择与移动 | **386 checks / 0 failures**；真实头像点击选择 B、C，三人通过生产导航抵达 POI，再走离 POI |
-| Survivor Marker V2 专项 | **PENDING**；静止、移动、搜索三种状态均检查三名成员平等显示、无头像纹理、无小地图选择状态 |
+| Survivor Marker V2 专项 | **19 checks / 0 failures**；静止、移动、搜索三种状态均检查三名成员平等显示、无头像纹理、无小地图选择状态 |
 | 最终三份专项日志 | Missing Resource=0；Invalid UID=0；Runtime Error=0；Warning=0 |
 | E01 冻结集 | **633 / 633** 未变化 |
 | M03 冻结集 | **622 / 622** 未变化 |
@@ -57,12 +57,12 @@ Godot 4.7.2 / Compatibility。四种子均为单次静态构建，尺度始终�
 
 - [01 Arrival](../test-output/expedition-integration-e01-5-fix/01_local_minimap_arrival.png)
 - [02 三人同时可见](../test-output/expedition-integration-e01-5-fix/02_all_survivors_visible.png)
-- [03 静止三人](../test-output/minimap-survivor-marker-v2/01-static.png)
-- [04 移动状态](../test-output/minimap-survivor-marker-v2/02-moving.png)
+- [03 静止三人](../test-output/minimap-survivor-marker-acceptance/01-static.png)
+- [04 移动状态](../test-output/minimap-survivor-marker-acceptance/02-moving.png)
 - [05 局部跟随移动](../test-output/expedition-integration-e01-5-fix/05_local_follow_mid_move.png)
 - [06 远处 POI 边缘标记](../test-output/expedition-integration-e01-5-fix/06_poi_offscreen_edge_marker.png)
 - [07 抵达 POI](../test-output/expedition-integration-e01-5-fix/07_arrived_at_poi.png)
-- [08 搜索状态](../test-output/minimap-survivor-marker-v2/03-searching.png)
+- [08 搜索状态](../test-output/minimap-survivor-marker-acceptance/03-searching.png)
 - [09 走离后 POI 再次在边缘](../test-output/expedition-integration-e01-5-fix/09_poi_leaves_local_window.png)
 - [选择与移动总览](../test-output/expedition-integration-e01-5-fix/local_minimap_contact_sheet.png)
 - [选择与移动视频](../test-output/expedition-integration-e01-5-fix/local_minimap_survivor_selection_and_move.mp4)：1600×900、30fps、1,997 帧、66.567 秒。

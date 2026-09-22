@@ -161,9 +161,19 @@ func run() -> void:
 	mission.camera_center = site.spec.entry
 	mission.camera_controller.apply()
 	await frames(4)
+	var discover_point: MeshInstance3D = site.get("discover_point") as MeshInstance3D
+	check(is_instance_valid(discover_point), "Searchable building owns a discover marker")
+	check(discover_point.image_name == "world_discover_marker", "Available state uses the dedicated discover marker")
+	check(discover_point.get_node_or_null("DiscoveryRipple") != null, "Discover marker has a native scanning ripple")
+	check(discover_point.visible, "Available discover marker is visible before hover")
+	var ripple_scale_before: Vector3 = (discover_point.get_node("DiscoveryRipple") as MeshInstance3D).scale
+	await frames(8)
+	var ripple_scale_after: Vector3 = (discover_point.get_node("DiscoveryRipple") as MeshInstance3D).scale
+	check(ripple_scale_before != ripple_scale_after, "Available discover marker ripple animates without a baked asset")
 	await hover(hud.brand_panel.get_global_rect().get_center())
 	await snap("03_search_discoverability_idle")
 	await hover(mission.camera.unproject_position(site.spec.entry + Vector3.UP * .2))
+	check(not discover_point.visible, "Hover hides the Available marker behind the search prompt")
 	await snap("03_building_compact")
 	await click_at(mission.camera.unproject_position(site.spec.entry + Vector3.UP * .2))
 	check(mission.search_tasks.has(site_id), "Actual building entrance click starts the original search")
@@ -181,6 +191,7 @@ func run() -> void:
 	check(card.is_visible_in_tree() and card.progress.value > 0, "Visible search card reads live progress")
 	check(is_equal_approx(card.progress.value, site.progress * 100), "Displayed percentage equals authoritative site progress")
 	check(site.ring.image_name == "world_search_marker" and site.ring.visible, "Search marker reflects the real running task")
+	check(not discover_point.visible, "Searching keeps the Available marker hidden")
 	await snap("03_building_search")
 	var position_before: Vector2 = card.position
 	for i: int in range(20):
@@ -208,10 +219,30 @@ func run() -> void:
 	check(site.searched, "Restarted search completes through the original algorithm")
 	hud.refresh()
 	await frames(4)
+	var loot_feedback: Node3D = mission.world_interaction_vfx.get_node_or_null("LootFeedback") as Node3D
+	check(is_instance_valid(loot_feedback), "Collected search reward creates small world-space feedback")
+	if is_instance_valid(loot_feedback):
+		var nearest_member: Node3D
+		var nearest_distance: float = INF
+		for member: Node3D in mission.living():
+			var distance: float = member.global_position.distance_squared_to(loot_feedback.global_position)
+			if distance < nearest_distance:
+				nearest_member = member
+				nearest_distance = distance
+		var horizontal_gap: float = Vector2(loot_feedback.global_position.x, loot_feedback.global_position.z).distance_to(Vector2(nearest_member.global_position.x, nearest_member.global_position.z))
+		check(horizontal_gap >= .5 and horizontal_gap <= .8, "Reward feedback sits beside the survivor instead of covering them")
+		check(is_equal_approx(float(loot_feedback.get_meta("lifetime", 0.0)), 1.5), "Reward feedback has a 1.5 second lifecycle")
+		var reward_labels: Array[Node] = loot_feedback.find_children("*", "Label3D", true, false)
+		var reward_label: Label3D = reward_labels[0] as Label3D if not reward_labels.is_empty() else null
+		check(is_instance_valid(reward_label) and reward_label.font_size <= 24 and reward_label.pixel_size <= .0141,
+			"Reward feedback uses compact world-space type")
 	await hover(mission.camera.unproject_position(site.spec.entry + Vector3.UP * .2))
 	await snap("03_search_discoverability_complete")
-	await create_timer(2.7).timeout
+	await create_timer(1.55).timeout
+	check(not is_instance_valid(loot_feedback), "Reward feedback frees itself after 1.5 seconds")
+	await create_timer(1.15).timeout
 	await snap("03_search_discoverability_searched")
+	check(not discover_point.visible, "Completed targets do not restore the Available marker")
 	check(hud.site_buttons[site_id].status.text == "已搜", "Objective updates after completion")
 	if not mission.pickups.is_empty():
 		check(mission.pickups[0].view.has_node("WorldLootMarker"), "Real search reward creates its loot marker")

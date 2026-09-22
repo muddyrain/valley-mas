@@ -22,6 +22,9 @@ static func generate(rng: RandomNumberGenerator) -> Dictionary:
 	_chain(roads, "ServiceBranch", [Vector2(se, 0), Vector2(se, east_bend), Vector2(east_stem, east_bend), Vector2(east_stem, east_tip)])
 	roads.append(_road(Vector2(nw, north), Vector2(outer, north), 7, "connector", "NorthLink"))
 	roads.append(_road(Vector2(nw, neck), Vector2(ne, neck), 7, "connector", "ParkLink"))
+	# A short arrival access lane makes the main-street gateway a real T-junction
+	# while staying in the open shoulder beyond the generated blocks.
+	roads.append(_road(Vector2(-116, 0), Vector2(-116, 24), 7, "connector", "ArrivalLink"))
 	var blocks: Array[Dictionary] = []
 	blocks.append(_lot(roads[0], -120, nw - 4, "north", 24, "LONG_STRIP", "RESIDENTIAL_BLOCK_A", "residential", 5))
 	blocks.append(_lot(roads[0], sw + 8, ne - 8, "south", 13, "LONG_STRIP", "COMMERCIAL_STRIP_A", "commercial", 8))
@@ -55,6 +58,7 @@ static func generate(rng: RandomNumberGenerator) -> Dictionary:
 	for i: int in blocks.size():
 		blocks[i].id = "A%02d" % i
 	var arrivals: Array[Dictionary] = []
+	arrivals.append({"id": "Arrival_GatewayJunction", "position": Vector3(-116, 0, 0), "road_index": 0, "yaw": -PI * 0.5})
 	for side: int in [-1, 1]:
 		arrivals.append({"id": "Arrival_MainStart" if side < 0 else "Arrival_MainEnd", "position": Vector3(side * 116, 0, 0), "road_index": 0, "yaw": side * PI * 0.5})
 	arrivals.append({"id": "Arrival_ResidentialEdge", "position": Vector3(west_stem, 0, west_tip - 3), "road_index": 3, "yaw": PI})

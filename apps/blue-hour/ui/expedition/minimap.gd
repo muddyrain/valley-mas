@@ -32,7 +32,6 @@ var static_build_ms: float = 0.0
 var town_markers: Array[Dictionary] = []
 var _cached_size: Vector2 = Vector2.ZERO
 var _area: Rect2
-var _label_rect: Rect2
 var marker_update_count: int = 0
 var full_refresh_count: int = 0
 var _town_dynamic_elapsed: float = TOWN_DYNAMIC_INTERVAL
@@ -133,9 +132,6 @@ func _draw() -> void:
 		if member.dead: continue
 		var point: Vector2 = project.call(member.position)
 		_draw_survivor_marker(point, _survivor_is_moving(member), _survivor_is_searching(member))
-	var label_rect := Rect2(area.position + Vector2(8, area.size.y - 32), Vector2(112, 24))
-	draw_rect(label_rect, Color("#0c2338d9"), true)
-	draw_string(ThemeDB.fallback_font, label_rect.position + Vector2(8, 15), mission.city.data.display_name, HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Color("#d5e4e5"))
 
 func _draw_marker(texture: Texture2D, point: Vector2, diameter: float) -> void:
 	if texture == null: return
@@ -190,7 +186,6 @@ func _sync_town() -> void:
 		marker_rect = minimap_content_rect
 		world_clip.position = minimap_content_rect.position
 		world_clip.size = minimap_content_rect.size
-		_label_rect = Rect2(_area.position + Vector2(8, _area.size.y - 26), Vector2(140, 22))
 		world_clip.queue_redraw()
 	follow_center = mission.squad_center()
 	map_scale = minimap_content_rect.size.x / (local_world_extent * 2.0)
@@ -415,8 +410,6 @@ func _draw_town_markers() -> void:
 			var side: Vector2 = item.direction.orthogonal() * 2.5
 			draw_line(tip - item.direction * 3.0 + side, tip, Color("#f6f0df"), 1.2, true)
 			draw_line(tip - item.direction * 3.0 - side, tip, Color("#f6f0df"), 1.2, true)
-	draw_rect(_label_rect, Color("#0c2338d9"))
-	draw_string(ThemeDB.fallback_font, _label_rect.position + Vector2(8, 15), "Medium Town V1", HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Color("#d5e4e5"))
 
 class LocalWorldClip extends Control:
 	func _draw() -> void:

@@ -1,0 +1,19 @@
+[gd_resource type="Resource" script_class="SurvivorProfile" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/survivor_profile.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "SUR_001"
+name = "夏知遥"
+age = 0
+occupation = "城市徒步 / 摄影爱好者"
+role = "探索核心"
+personality = "敏锐、好奇，习惯先观察环境再行动。"
+background = "她喜欢钻进城市里不太被注意的小巷、旧街区和废弃建筑，用相机记录路线与细节。"
+before_apocalypse = "灾变前，她以城市徒步和摄影为日常，熟悉城市空间中容易被忽略的入口。"
+after_apocalypse = "灾变后，她把对环境异常的敏感带进搜寻行动，总能更快找到入口、储藏间和遗漏物资。"
+trait_explanation = "搜寻直觉来自持续的观察与调查能力，提高建筑、车辆和其他搜刮点的搜索速度。"
+weapon_preference = "SMG / 手枪 / 轻型步枪"
+mission_preference = "城市探索、建筑搜寻、路线侦察"
+story_tags = ["探索", "摄影", "观察", "搜索"]

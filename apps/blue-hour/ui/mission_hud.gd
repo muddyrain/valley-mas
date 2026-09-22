@@ -22,10 +22,12 @@ const DebugMenu = preload("res://debug/debug_menu.gd")
 const SettingsView = preload("res://ui/settings_view.gd")
 const HudArt = preload("res://ui/expedition/hud_skin.gd")
 const WorldMarkers = preload("res://ui/expedition/world_markers.gd")
+const AmbientThreat = preload("res://encounter/ambient_threat_runtime.gd")
 const Visual = preload("res://ui/expedition/hud_visual_profile.gd")
 const Minimap = preload("res://ui/expedition/minimap.gd")
 const HotkeyBadge = preload("res://ui/expedition/hotkey_badge.gd")
 const HUD_SCALE: float = .8
+const LIGHT_TOAST_SECONDS: float = .9
 var mission: Node3D
 var game_settings: RefCounted
 var phase_label: Label
@@ -79,6 +81,7 @@ var command_buttons: Dictionary = {}
 var clock_surface: StyleBox
 var ui_viewport: Viewport
 var world_markers: Node3D
+var ambient_threat: Node
 var squad_scroll: ScrollContainer
 var squad_column: VBoxContainer
 var selected_member: Node3D
@@ -96,6 +99,12 @@ func _exit_tree() -> void:
 
 func setup(target: Node3D, preferences: RefCounted = null) -> void:
 	mission = target
+	ambient_threat = mission.get_node_or_null("AmbientThreatRuntime")
+	if ambient_threat == null:
+		ambient_threat = AmbientThreat.new()
+		ambient_threat.name = "AmbientThreatRuntime"
+		mission.add_child(ambient_threat)
+		ambient_threat.setup(mission)
 	game_settings = preferences
 	ui_viewport = get_viewport()
 	set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
@@ -525,9 +534,19 @@ func _build_commands() -> void:
 	order_label.offset_left = -dock_width / 2
 	order_label.offset_top = -202
 	add_child(order_label)
-	toast_panel = Style.anchored(self, "LootToast", PRESET_CENTER_BOTTOM, Rect2(-240, -248, 480, 72))
-	toast_panel.add_theme_stylebox_override("panel", HudArt.surface("loot_toast_bg", Vector4(12, 8, 12, 8)))
-	toast = UI.label("", 14, Style.INK)
+	order_label.hide()
+	toast_panel = Style.anchored(self, "LootToast", PRESET_CENTER_BOTTOM, Rect2(-190, -250, 380, 46))
+	var toast_style := StyleBoxFlat.new()
+	toast_style.bg_color = Color("#10202ed9")
+	toast_style.border_color = Color("#6cabb8c0")
+	toast_style.set_border_width_all(1)
+	toast_style.set_corner_radius_all(5)
+	toast_style.content_margin_left = 12
+	toast_style.content_margin_right = 12
+	toast_style.content_margin_top = 6
+	toast_style.content_margin_bottom = 6
+	toast_panel.add_theme_stylebox_override("panel", toast_style)
+	toast = UI.label("", 14, UI.TEXT)
 	toast.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	toast.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	toast_panel.add_child(toast)
@@ -568,7 +587,7 @@ func _process(delta: float) -> void:
 		search_notices.pop_front()
 		if not search_notices.is_empty():
 			toast.text = search_notices[0].text
-			toast_left = 4.0
+			toast_left = LIGHT_TOAST_SECONDS
 	toast.visible = toast_left > 0
 	toast_panel.visible = toast.visible
 	tracker_left -= delta
@@ -701,12 +720,19 @@ func _build_menus() -> void:
 		settings_menu.hide()
 
 func show_notice(text: String) -> void:
+	if _is_routine_notice(text):
+		return
 	# Completion summaries retain their worker/target identity while pickups arrive.
 	if not search_notices.is_empty():
 		return
 	toast.text = text
-	toast_left = 4.0
+	toast_left = LIGHT_TOAST_SECONDS
+	toast.show()
+	toast_panel.show()
 	_animate_toast()
+
+func _is_routine_notice(text: String) -> bool:
+	return text.contains("进度保留") or text.contains(" 前往搜索 ") or text in ["行动暂停", "继续行动"]
 
 func _show_search_result(id: String, worker_name: String, loot: Dictionary, collected: bool = false) -> void:
 	if not mission.city.sites.has(id):
@@ -714,7 +740,6 @@ func _show_search_result(id: String, worker_name: String, loot: Dictionary, coll
 	var site: Dictionary = mission.city.sites[id]
 	if not collected and is_instance_valid(mission.world_interaction_vfx):
 		mission.world_interaction_vfx.play_search_complete(site.spec.entry)
-	if collected and is_instance_valid(mission.world_interaction_vfx):
 		mission.world_interaction_vfx.play_loot_feedback(site.spec.entry, loot)
 	var rewards: PackedStringArray = []
 	if int(loot.food) > 0:
@@ -730,13 +755,15 @@ func _show_search_result(id: String, worker_name: String, loot: Dictionary, coll
 			search_notices[index].text = text
 			if index == 0:
 				toast.text = text
-				toast_left = 4.0
+				toast_left = LIGHT_TOAST_SECONDS
+				toast.show()
+				toast_panel.show()
 				_animate_toast()
 			return
 	search_notices.append({"id": id, "text": text})
 	if search_notices.size() == 1:
 		toast.text = text
-		toast_left = 4.0
+		toast_left = LIGHT_TOAST_SECONDS
 		toast.show()
 		toast_panel.show()
 		_animate_toast()

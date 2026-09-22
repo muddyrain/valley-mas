@@ -8,6 +8,7 @@ func run() -> void:
 	var app: Node = await create_app(4101)
 	var mission: Node3D = app.mission
 	var map: Control = app.hud.minimap
+	_check_formal_map_surface()
 	map._process(0.0)
 	await _capture(map, "01-static.png")
 	var moving: Node3D = mission.survivors[0]
@@ -28,6 +29,13 @@ func run() -> void:
 	report.store_string(JSON.stringify({"checks": checks, "failures": failures}, "\t"))
 	print("MINIMAP SURVIVOR MARKER ACCEPTANCE: %d checks, %d failures" % [checks, failures.size()])
 	quit(0 if failures.is_empty() else 1)
+
+func _check_formal_map_surface() -> void:
+	var source := FileAccess.get_file_as_string("res://ui/expedition/minimap.gd")
+	check(source.find("Medium Town V1") < 0, "MiniMap has no visible town version label")
+	check(source.find("display_name") < 0, "MiniMap has no visible map name label")
+	check(source.find("_label_rect") < 0, "MiniMap has no debug label layout state")
+	check(source.find("draw_string") < 0, "MiniMap has no text drawing path")
 
 func _check_survivor_state(map: Control, moving: bool, searching: bool) -> void:
 	var survivors: Array = map.town_markers.filter(func(marker: Dictionary) -> bool: return marker.kind == "survivor")

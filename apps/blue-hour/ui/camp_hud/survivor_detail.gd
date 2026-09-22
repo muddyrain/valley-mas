@@ -5,7 +5,7 @@ var survivor_id: String = ""
 func show_survivor(data: Dictionary) -> void:
 	survivor_id = str(data.get("id", ""))
 	$HeaderPanel/SurvivorName.text = str(data.get("name", ""))
-	$HeaderPanel/SurvivorNameEn.text = "%s · Lv.%d" % [
+	$HeaderPanel/SurvivorNameEn.text = "%s Lv.%d" % [
 		str(data.get("id", "")),
 		int(data.get("level", 1)),
 	]
@@ -13,6 +13,7 @@ func show_survivor(data: Dictionary) -> void:
 		roundi(float(data.get("hp", 0.0))),
 		roundi(float(data.get("max_hp", 0.0))),
 	]
+	$HeaderPanel/TraitBadge/Label.text = str(data.get("trait", "未定义"))
 	var background_title := str(data.get("background_title", ""))
 	var background_description := str(data.get("background_description", ""))
 	$HeaderPanel/RoleLabel.text = background_title

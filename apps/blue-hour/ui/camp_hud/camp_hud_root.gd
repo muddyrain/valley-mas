@@ -28,6 +28,9 @@ func _ready() -> void:
 func configure_roster(catalog: RefCounted, campaign: RefCounted) -> void:
 	$M04_SurvivorRoster.configure(catalog, campaign)
 
+func refresh_roster() -> void:
+	$M04_SurvivorRoster.refresh()
+
 func set_hud_visible(value: bool) -> void:
 	for module: Control in _modules:
 		module.visible = value and (module != $M05_SurvivorDetail or selected_survivor_id != null)

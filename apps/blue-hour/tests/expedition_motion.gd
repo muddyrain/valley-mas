@@ -34,7 +34,7 @@ func run() -> void:
 	await click(app.screen.cards.commercial)
 	await click(app.screen.confirm_button)
 	check(app.state == "mission", "Motion recording enters the formal expedition")
-	check(app.mission.camera.size == 25, "Recording starts at the normal default camera")
+	check(app.mission.camera.size == 23, "Recording starts at the normal default camera")
 	DirAccess.make_dir_recursive_absolute(DIRECTORY)
 	var metadata: Array[Dictionary] = []
 	var point := Vector2(800, 450)

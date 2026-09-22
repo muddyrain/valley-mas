@@ -1,0 +1,19 @@
+[gd_resource type="Resource" script_class="SurvivorProfile" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/survivor_profile.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "SUR_003"
+name = "林见月"
+age = 0
+occupation = "竞技射击与户外运动爱好者"
+role = "近战战斗"
+personality = "反应迅速，面对突发危险时很少僵住。"
+background = "她没有军事背景，但长期在高速变化的运动环境中训练判断和行动。"
+before_apocalypse = "灾变前，她投入竞技射击和户外运动，熟悉近距离压力下的快速决策。"
+after_apocalypse = "灾变后，她会优先判断最近的威胁与可行路线，为队伍打开安全空间。"
+trait_explanation = "危险直觉来自长期身体训练与临场判断能力，强化近距离战斗表现。"
+weapon_preference = "霰弹枪 / SMG / 近战"
+mission_preference = "高压搜寻、近距离清理、突围"
+story_tags = ["战斗", "户外", "反应", "近距离"]

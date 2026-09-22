@@ -45,6 +45,7 @@ const SEARCH_COMPLETE_COLOR: Color = Color(.72, .96, .92, .92)
 const LOOT_FOOD_COLOR: Color = Color("#f6d58c")
 const LOOT_SCRAP_COLOR: Color = Color("#a9d7e2")
 const LOOT_WEAPON_COLOR: Color = Color("#c6b5ff")
+const LOOT_FEEDBACK_SECONDS: float = 1.5
 const Ground = preload("res://maps/expedition/walkable_ground.gd")
 var command_lines: Dictionary = {}
 var mission: Node3D
@@ -281,25 +282,47 @@ func play_loot_feedback(point: Vector3, loot: Dictionary) -> void:
 	var loot_group := Node3D.new()
 	loot_group.name = "LootFeedback"
 	add_child(loot_group)
-	loot_group.global_position = _ground_point(point) + Vector3.UP * 1.0
+	loot_group.global_position = _reward_feedback_origin(point)
+	loot_group.set_meta("lifetime", LOOT_FEEDBACK_SECONDS)
 	var icon := Sprite3D.new()
 	icon.texture = HudArt.texture(icon_name)
-	icon.pixel_size = .004
+	icon.pixel_size = .0034
 	icon.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	icon.no_depth_test = true
 	icon.modulate = label_color
-	icon.position = Vector3(-.42, 0, 0)
+	icon.position = Vector3(-.31, 0, 0)
 	loot_group.add_child(icon)
-	var label: Label3D = Visuals.label(loot_group, " · ".join(entries), Vector3(.08, 0, 0), label_color, 34)
-	loot_group.scale = Vector3.ONE * .72
-	var duration: float = 1.08 if has_weapon else .78
-	var tween := create_tween()
-	tween.tween_property(loot_group, "global_position", loot_group.global_position + Vector3.UP * .72, duration).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
-	tween.parallel().tween_property(loot_group, "scale", Vector3.ONE, .16).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	tween.tween_interval(duration - .25)
-	tween.parallel().tween_property(label, "modulate:a", 0.0, .25)
-	tween.parallel().tween_property(icon, "modulate:a", 0.0, .25)
-	tween.tween_callback(loot_group.queue_free)
+	var label: Label3D = Visuals.label(loot_group, " · ".join(entries), Vector3(.06, 0, 0), label_color, 24)
+	label.pixel_size = .014
+	label.outline_size = 2
+	loot_group.scale = Vector3.ONE * .64
+	var tween := create_tween().set_parallel(true)
+	tween.tween_property(loot_group, "global_position", loot_group.global_position + Vector3.UP * .5,
+		LOOT_FEEDBACK_SECONDS).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	tween.tween_property(loot_group, "scale", Vector3.ONE * .78, .14).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tween.tween_property(label, "modulate:a", 0.0, .32).set_delay(LOOT_FEEDBACK_SECONDS - .32)
+	tween.tween_property(icon, "modulate:a", 0.0, .32).set_delay(LOOT_FEEDBACK_SECONDS - .32)
+	tween.chain().tween_callback(loot_group.queue_free)
+
+func _reward_feedback_origin(fallback: Vector3) -> Vector3:
+	var nearest: Node3D
+	var nearest_distance: float = INF
+	if mission != null and mission.has_method("living"):
+		for member: Node3D in mission.living():
+			if member.inside_building:
+				continue
+			var distance: float = member.global_position.distance_squared_to(fallback)
+			if distance < nearest_distance:
+				nearest = member
+				nearest_distance = distance
+	if not is_instance_valid(nearest):
+		return _ground_point(fallback) + Vector3.UP * 1.15
+	var side := Vector3.RIGHT
+	if is_instance_valid(mission.camera):
+		side = mission.camera.global_basis.x
+		side.y = 0.0
+		side = side.normalized() if side.length_squared() > 0.001 else Vector3.RIGHT
+	return nearest.global_position + side * .62 + Vector3.UP * 1.25
 
 func set_focus_target(target: Node3D) -> void:
 	if not is_instance_valid(target):

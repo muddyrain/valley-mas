@@ -3,6 +3,7 @@ extends Node3D
 const Marker = preload("res://ui/expedition/world_marker.gd")
 const Visual = preload("res://ui/expedition/hud_visual_profile.gd")
 const UPDATE_INTERVAL: float = 1.0 / 20.0
+const DISCOVERABLE_POI_TYPES: PackedStringArray = ["house", "shop", "supermarket", "warehouse"]
 var mission: Node3D
 var context: Control
 var selected_member: Node3D
@@ -72,14 +73,18 @@ func _process(delta: float) -> void:
 		var focused: bool = hovered or selected
 		var ui_anchor: Node3D = site.get("search_ui_anchor") as Node3D
 		var anchor_point: Vector3 = ui_anchor.global_position if is_instance_valid(ui_anchor) else site.ring.global_position
+		var marker_target: bool = _supports_discovery_marker(site)
 		var visible_target: bool = mission.input_enabled and site.discovered and not site.searched and _in_view(anchor_point) and mission.exploration.is_visible(site.spec.entry)
 		var discover_point: MeshInstance3D = site.get("discover_point") as MeshInstance3D
 		if is_instance_valid(discover_point):
-			discover_point.visible = visible_target and not busy and not focused
+			discover_point.visible = marker_target and visible_target and not busy and not focused
 			if discover_point.visible:
 				discover_point.global_position = anchor_point
-				discover_point.scale = Vector3.ONE * (.92 + .08 * (0.5 + 0.5 * sin(_pulse * TAU / 1.15)))
-				discover_point.material_override.albedo_color = Visual.world_tint(.68 + .08 * sin(_pulse * TAU / 1.15), 1.1)
+				discover_point.scale = Vector3.ONE * (.98 + .02 * (0.5 + 0.5 * sin(_pulse * TAU / 1.35)))
+				if discover_point.has_method("animate_discovery"):
+					discover_point.call("animate_discovery", _pulse)
+				else:
+					discover_point.material_override.albedo_color = Visual.world_tint(.68 + .08 * sin(_pulse * TAU / 1.15), 1.1)
 		site.ring.visible = visible_target and (busy or focused)
 		site.ring.set_image("world_search_marker" if busy else "world_interact_marker" if focused else "icon_vehicle" if site.vehicle else "icon_house")
 		var marker_alpha: float = Visual.SEARCH_ALPHA if busy else Visual.SITE_HOVER_ALPHA
@@ -126,3 +131,10 @@ func _process(delta: float) -> void:
 
 func _in_view(point: Vector3) -> bool:
 	return not mission.camera.is_position_behind(point) and get_viewport().get_visible_rect().has_point(mission.camera.unproject_position(point))
+
+func _supports_discovery_marker(site: Dictionary) -> bool:
+	if bool(site.get("vehicle", false)):
+		return false
+	var spec: Dictionary = site.get("spec", {})
+	var poi_type: String = str(spec.get("poi_type", "")).to_lower()
+	return poi_type in DISCOVERABLE_POI_TYPES

@@ -1,5 +1,5 @@
 extends RefCounted
-enum NoiseType { ARRIVAL, FOOTSTEP, MELEE, PISTOL, RIFLE, SHOTGUN, EXPLOSION }
+enum NoiseType { ARRIVAL, FOOTSTEP, MELEE, PISTOL, RIFLE, SHOTGUN, EXPLOSION, SEARCH, SEARCH_COMPLETE }
 var world_position := Vector3.ZERO
 var radius: float = 0.0
 var intensity: float = 1.0

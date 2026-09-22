@@ -1,0 +1,19 @@
+[gd_resource type="Resource" script_class="SurvivorProfile" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/survivor_profile.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "SUR_005"
+name = "沈砚川"
+age = 0
+occupation = "理工专业学生 / 电子维修店兼职"
+role = "工程交互"
+personality = "专注、务实，遇到故障会先弄清楚原因。"
+background = "他喜欢弄清楚东西为什么坏掉，而不是直接把它扔掉。"
+before_apocalypse = "灾变前，他在理工学习与电子维修工作之间积累了电路和设备经验。"
+after_apocalypse = "灾变后，他会蹲下来检查收音机、电路和车辆的小故障，尽力让设备继续工作。"
+trait_explanation = "临时修复来自设备维护能力，减少车辆与设备互动的耗时。"
+weapon_preference = "步枪 / 手枪"
+mission_preference = "设备维护、车辆搜寻、技术路线"
+story_tags = ["工程", "维修", "电子", "设备"]

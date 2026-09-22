@@ -1,0 +1,12 @@
+[gd_resource type="Resource" format=3]
+[ext_resource type="PackedScene" path="res://assets/world/props/street_prop_pack_v1/PRP_RUIN_001_garbage_bag_pile.glb" id="1"]
+[ext_resource type="Script" path="res://data/world_asset_data.gd" id="2"]
+[resource]
+script = ExtResource("2")
+id = "PRP_RUIN_001_garbage_bag_pile"
+scene = ExtResource("1")
+category = "ruin"
+footprint = Vector2(1.15, 0.85)
+bounding_size = Vector3(1.13, 0.56, 0.776)
+searchable = false
+environment_tags = PackedStringArray("INDUSTRIAL", "COMMERCIAL")

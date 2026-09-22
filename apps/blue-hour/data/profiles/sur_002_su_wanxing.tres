@@ -1,0 +1,19 @@
+[gd_resource type="Resource" script_class="SurvivorProfile" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/survivor_profile.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "SUR_002"
+name = "苏晚星"
+age = 0
+occupation = "活动物资管理 / 采购兼职"
+role = "资源管理"
+personality = "细致、克制，习惯记录并比较每一件物资的价值。"
+background = "她习惯记录每件东西去了哪里、还剩多少，以及什么东西真正值得留下。"
+before_apocalypse = "灾变前，她负责活动物资管理与采购，长期处理清单、库存和有限预算。"
+after_apocalypse = "灾变后，她仍按清单整理零散资源，把真正有用的物资留给队伍。"
+trait_explanation = "精打细算体现了她对物资价值的判断能力，获得基础资源时有概率额外获得一份。"
+weapon_preference = "突击步枪 / SMG"
+mission_preference = "物资搜集、仓储清点、补给路线"
+story_tags = ["资源", "采购", "仓储", "管理"]

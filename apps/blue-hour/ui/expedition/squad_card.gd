@@ -148,7 +148,8 @@ func set_selected(selected: bool) -> void:
 	summary.add_theme_color_override("font_color", Style.INK)
 
 func update_member(member: Node3D, mission: Node3D) -> void:
-	var danger_state: bool = member.dead or member.hp < member.data.max_hp * .5
+	var nearby_threat: bool = _has_nearby_threat(member, mission)
+	var danger_state: bool = member.dead or member.hp < member.data.max_hp * .5 or nearby_threat
 	if danger_state:
 		add_theme_stylebox_override("panel", HudArt.surface("hud_survivor_card_bg_danger", Vector4(12, 12, 12, 12)))
 	else:
@@ -174,6 +175,14 @@ func update_member(member: Node3D, mission: Node3D) -> void:
 		status.text = "受伤 · %d" % member.hp
 	elif member.cooldown > 0 or member.reload_left > 0:
 		status.text = "战斗"
-	status_dot.texture = HudArt.texture("ui_status_dot_red" if status.text == "战斗" or status.text.begins_with("自卫") or danger_state else "ui_status_dot_blue")
+	elif nearby_threat:
+		status.text = "警戒"
+	status_dot.texture = HudArt.texture("ui_status_dot_red" if status.text in ["战斗", "警戒"] or status.text.begins_with("自卫") or danger_state else "ui_status_dot_blue")
 	tooltip_text = "%s · %d/%d HP\n%s · %s\n%s" % [member.data.display_name, member.hp, member.data.max_hp, (member.weapon.display_name if member.weapon != null else "未装备"), member.talent.display_name, member.talent.description]
 	modulate = Color("#8b9499") if member.dead else Color.WHITE
+
+func _has_nearby_threat(member: Node3D, mission: Node3D) -> bool:
+	for enemy: Node3D in mission.enemies:
+		if enemy.active and enemy.position.distance_to(member.position) <= 12.0:
+			return true
+	return false

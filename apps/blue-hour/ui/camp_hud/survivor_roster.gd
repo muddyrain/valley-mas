@@ -43,11 +43,11 @@ func _rebuild() -> void:
 	if not is_node_ready() or _catalog == null:
 		return
 	_views = RosterAdapter.build(_catalog, _campaign)
-	var party_count := 0
+	var recruited_count := 0
 	for view: Dictionary in _views:
-		if bool(view.get("is_party_member", false)):
-			party_count += 1
-	$Header/Count.text = "%d/%d" % [party_count, _views.size()]
+		if bool(view.get("is_recruited", false)):
+			recruited_count += 1
+	$Header/Count.text = "%d/%d" % [recruited_count, _views.size()]
 	var container := $RosterContainer/ScrollContainer/VBoxContainer as VBoxContainer
 	for child: Node in container.get_children():
 		if child.name != "EntryTemplate":
@@ -93,7 +93,8 @@ func _max_scroll() -> float:
 	return maxf(0.0, content_height - _scroll.size.y)
 
 func _select_survivor(survivor_id: String) -> void:
-	if survivor_id.is_empty() or get_survivor_view_data(survivor_id).is_empty():
+	var view := get_survivor_view_data(survivor_id)
+	if survivor_id.is_empty() or view.is_empty() or not bool(view.get("is_recruited", false)):
 		return
 	if selected_survivor_id == survivor_id:
 		return

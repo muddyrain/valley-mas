@@ -28,7 +28,12 @@ static func finish(town: Dictionary, arrivals: Array, rng: RandomNumberGenerator
 		var road: Dictionary = town.roads[candidate.road_index]
 		var point := Vector2(candidate.position.x, candidate.position.z)
 		candidate.connected = town.town_metrics.connectivity and road.width >= 7 and Geometry2D.get_closest_point_to_segment(point, road.start, road.end).distance_to(point) < 0.01
-	town.arrival = arrivals[rng.randi_range(0, arrivals.size() - 1)]
+	# Ground spaces are independent of the arrival point, so build them before scoring.
+	# This lets the first view prefer a real parking surface instead of an empty road edge.
+	town.arrival = arrivals[0] if not arrivals.is_empty() else {}
+	_cover_ground(town)
+	_add_arrival_support_parking(town)
+	town.arrival = _select_arrival(town, arrivals, rng)
 	town.extraction = town.arrival
 	var farthest := -1.0
 	var origin := Vector2(town.arrival.position.x, town.arrival.position.z)
@@ -55,10 +60,76 @@ static func finish(town: Dictionary, arrivals: Array, rng: RandomNumberGenerator
 			arrival_block = block
 	arrival_block.zone_tags.append("ARRIVAL_ZONE")
 	town.exploration_routes = _routes(town)
-	_cover_ground(town)
 	town.blueprint = _metrics(town)
 	_orient(town, rng.randi_range(0, 3))
 	town.town_metrics.alternative_route_count = town.exploration_routes.size()
+
+static func _select_arrival(town: Dictionary, arrivals: Array, rng: RandomNumberGenerator) -> Dictionary:
+	var selected: Dictionary = arrivals[0] if not arrivals.is_empty() else {}
+	if not arrivals.is_empty():
+		rng.randi_range(0, arrivals.size() - 1) # Preserve the legacy RNG stream before orientation.
+	var best_score := -INF
+	for candidate: Dictionary in arrivals:
+		var point := Vector2(candidate.position.x, candidate.position.z)
+		var junctions := 0
+		for road: Dictionary in town.roads:
+			if Geometry2D.get_closest_point_to_segment(point, road.start, road.end).distance_to(point) < 0.01:
+				junctions += 1
+		var nearest_building := INF
+		var commercial_near := 0
+		for site: Dictionary in town.buildings:
+			var distance := point.distance_to(site.bounds.get_center())
+			nearest_building = minf(nearest_building, distance)
+			if site.land_use_type == "COMMERCIAL_CORE" and distance <= 34.0:
+				commercial_near += 1
+		var parking_near := 0
+		for space: Dictionary in town.ground_spaces:
+			if space.kind == "parking" and _polygon_bounds(space.polygon).get_center().distance_to(point) <= 70.0:
+				parking_near += 1
+		for block: Dictionary in town.blocks:
+			for space: Dictionary in block.spaces:
+				if space.kind == "parking" and space.bounds.get_center().distance_to(point) <= 70.0:
+					parking_near += 1
+		# Junctions establish the readable first view; nearby frontage keeps it urban.
+		var score := float(junctions) * 100.0
+		if is_finite(nearest_building):
+			score += maxf(0.0, 42.0 - nearest_building)
+		score += float(commercial_near) * 12.0
+		score += float(parking_near) * 45.0
+		# A hash tie-break preserves seeded variation without consuming the RNG stream
+		# used later for town orientation and POI selection.
+		score += float(abs(hash("%d:%s" % [town.seed, candidate.id]) % 1000)) * 0.00001
+		if score > best_score:
+			best_score = score
+			selected = candidate
+	return selected
+
+static func _polygon_bounds(polygon: PackedVector2Array) -> Rect2:
+	if polygon.is_empty():
+		return Rect2()
+	var bounds := Rect2(polygon[0], Vector2.ZERO)
+	for point: Vector2 in polygon:
+		bounds = bounds.expand(point)
+	return bounds
+
+static func _add_arrival_support_parking(town: Dictionary) -> void:
+	if town.arrival_candidates.is_empty():
+		return
+	for candidate: Dictionary in town.arrival_candidates:
+		var point := Vector2(candidate.position.x, candidate.position.z)
+		# A small street-side apron sits beyond the road shoulder at each seeded
+		# gateway candidate. Environment placement can then select any candidate
+		# without falling back to an empty road edge.
+		var polygon := rect_polygon(Rect2(point + Vector2(7.0, 7.0), Vector2(14.0, 7.0)))
+		var owner: Dictionary = town.blocks[0]
+		var nearest := INF
+		for block: Dictionary in town.blocks:
+			var distance := point.distance_to(block.bounds.get_center())
+			if distance < nearest:
+				nearest = distance
+				owner = block
+		var support := {"kind": "parking", "owner_block": owner.id, "polygon": polygon, "bounds": _polygon_bounds(polygon)}
+		town.ground_spaces.append(support)
 
 static func area(polygon: PackedVector2Array) -> float:
 	var total := 0.0

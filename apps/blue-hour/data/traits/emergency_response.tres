@@ -9,5 +9,5 @@ display_name = "应急处理"
 description = "每 10 秒治疗附近生命值最低的队友，治疗量按其最大生命计算。"
 trait_type = 1
 modifier_hook = "periodic_effect"
-params = {"effect_type": "heal", "interval": 10.0, "duration": 10.0, "radius": 6.0, "target_filter": "LOWEST_HP_ALLY"}
+params = {"effect_type": "heal", "interval": 10.0, "duration": 10.0, "radius": 6.0, "target_filter": "LOWEST_HP_ALLY", "condition": "hp_below_ratio", "condition_value": 0.5}
 levels = PackedFloat32Array(0.05, 0.06, 0.07, 0.08, 0.10)

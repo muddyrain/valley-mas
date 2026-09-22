@@ -1,37 +1,85 @@
 extends RefCounted
 ## Converts authored survivor definitions and the live campaign state into UI-only view data.
 
+const AVATAR_DIRECTORY := "res://assets/ui/camp/survivor_avatars"
+static var _avatar_path_cache: Dictionary = {}
+
 static func build(catalog: RefCounted, campaign: RefCounted) -> Array[Dictionary]:
 	var views: Array[Dictionary] = []
 	var party_ids: Array = _campaign_members(campaign)
 	var campaign_data: Dictionary = campaign.data if campaign != null else {}
 	var roster_state: Dictionary = campaign_data.get("roster", {})
-	for definition: Resource in catalog.survivors:
+	var roster_manager: SurvivorRosterManager = campaign.roster_manager() if campaign != null and campaign.has_method("roster_manager") else null
+	var definitions: Array[Resource] = _ordered_definitions(catalog, roster_manager)
+	for definition: Resource in definitions:
 		var survivor_id := str(definition.survivor_id)
+		var role_tags: Array[String] = []
+		for tag: String in definition.role_tags:
+			role_tags.append(tag)
+		var ownership_state := SurvivorRosterManager.RECRUITED
+		if roster_manager != null:
+			ownership_state = roster_manager.get_state(survivor_id)
+		var is_recruited := ownership_state == SurvivorRosterManager.RECRUITED
+		var is_discovered := ownership_state == SurvivorRosterManager.DISCOVERED
 		var member_key := _member_key(campaign, roster_state, survivor_id, str(definition.id))
 		var member_state: Dictionary = roster_state.get(member_key, {}) if not member_key.is_empty() else {}
 		var is_party_member := member_key in party_ids or survivor_id in party_ids or str(definition.id) in party_ids
 		var level := int(member_state.get("current_level", member_state.get("level", 1)))
 		var max_hp := float(member_state.get("max_hp", definition.max_hp))
 		var current_hp := float(member_state.get("hp", member_state.get("current_hp", max_hp)))
-		var portrait_path := str(definition.portrait)
-		var portrait: Texture2D = load(portrait_path) as Texture2D if not portrait_path.is_empty() else null
-		var detail := _detail_data(definition, portrait, current_hp, max_hp, level, campaign, member_key)
+		var avatar_path := _avatar_path(survivor_id)
+		var portrait: Texture2D = load(avatar_path) as Texture2D if not avatar_path.is_empty() else null
+		var detail := _detail_data(definition, portrait, current_hp, max_hp, level, campaign, member_key) if is_recruited else {}
+		var display_name := str(definition.display_name) if not ownership_state == SurvivorRosterManager.LOCKED else "未知幸存者"
+		var status_text := "已招募" if is_recruited else ("已发现 · 等待救援" if is_discovered else "未知幸存者")
 		views.append({
 			"survivor_id": survivor_id,
-			"display_name": str(definition.display_name),
+			"display_name": display_name,
+			"name_en": str(definition.id).to_upper(),
+			"tags": " · ".join(role_tags),
 			"portrait": portrait,
-			"portrait_path": portrait_path,
-			"level": level,
+			"portrait_path": avatar_path,
+			"avatar_path": avatar_path,
+			"level": level if is_recruited else 0,
+			"trait_name": str(detail.get("trait", "")) if is_recruited else "",
 			"hp": current_hp,
 			"max_hp": max_hp,
 			"current_hp": current_hp,
-			"current_state": str(member_state.get("current_state", member_state.get("status", "待命" if is_party_member else "未入队"))),
-			"status": str(member_state.get("current_state", member_state.get("status", "待命" if is_party_member else "未入队"))),
-			"is_party_member": is_party_member,
+			"current_state": status_text,
+			"status": status_text,
+			"ownership_state": ownership_state,
+			"is_recruited": is_recruited,
+			"is_discovered": is_discovered,
+			"is_party_member": is_party_member and is_recruited,
 			"detail": detail,
 		})
 	return views
+
+static func _ordered_definitions(catalog: RefCounted, roster_manager: SurvivorRosterManager) -> Array[Resource]:
+	if roster_manager == null:
+		return catalog.survivors.duplicate()
+	var ordered: Array[Resource] = []
+	var recruited := roster_manager.get_recruited_survivors()
+	var discovered := roster_manager.get_discovered_survivors()
+	var all := roster_manager.get_all_survivors()
+	for definition: Resource in recruited + discovered:
+		ordered.append(definition)
+	for definition: Resource in all:
+		if definition not in ordered:
+			ordered.append(definition)
+	return ordered
+
+static func _avatar_path(survivor_id: String) -> String:
+	if _avatar_path_cache.has(survivor_id):
+		return str(_avatar_path_cache[survivor_id])
+	var resolved_path := ""
+	if not survivor_id.is_empty():
+		for filename: String in DirAccess.get_files_at(AVATAR_DIRECTORY):
+			if filename.begins_with(survivor_id + "_") and filename.ends_with("_avatar.png"):
+				resolved_path = AVATAR_DIRECTORY + "/" + filename
+				break
+	_avatar_path_cache[survivor_id] = resolved_path
+	return resolved_path
 
 static func _campaign_members(campaign: RefCounted) -> Array:
 	if campaign == null or not campaign.data is Dictionary:

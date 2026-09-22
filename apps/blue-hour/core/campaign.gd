@@ -10,18 +10,22 @@ const Modifiers = preload("res://core/effect_modifiers.gd")
 const WeaponInventoryData = preload("res://weapons/weapon_inventory.gd")
 const WeaponInstanceData = preload("res://weapons/weapon_instance.gd")
 const SurvivorProgressionData = preload("res://data/survivor_progression.gd")
+const SurvivorRosterManagerData = preload("res://data/survivor_roster_manager.gd")
 var weapon_inventory: WeaponInventory
 var catalog: RefCounted
 var gear: RefCounted
 var data: Dictionary = {}
+var survivor_roster: SurvivorRosterManager
 
 func _init(content: RefCounted) -> void:
 	catalog = content
 	gear = Equipment.new(content)
 	weapon_inventory = WeaponInventoryData.new(self)
+	survivor_roster = SurvivorRosterManagerData.new(catalog)
 
 func new_run(seed_value: int = 0, specialization: String = "combat", fixture_templates: Array = []) -> void:
-	data = {"version": 5, "seed": seed_value if seed_value != 0 else int(Time.get_ticks_usec()) % 2147483647, "day": 1, "status": "shelter", "food": catalog.loop.initial_food, "scrap": 0, "hunger": 0, "members": [], "roster": {}, "inventory": [], "equipment": {}, "day_rewards": {}, "shop": [], "pending": {}, "history": [], "modified": false, "specialization": specialization, "passive_slots": [], "power_slots": [], "passive_items": {}, "power_items": {}, "passive_capacity": 1, "power_capacity": 1}
+	data = {"version": 5, "seed": seed_value if seed_value != 0 else int(Time.get_ticks_usec()) % 2147483647, "day": 1, "status": "shelter", "food": catalog.loop.initial_food, "scrap": 0, "hunger": 0, "members": [], "roster": {}, "survivor_states": {}, "inventory": [], "equipment": {}, "day_rewards": {}, "shop": [], "pending": {}, "history": [], "modified": false, "specialization": specialization, "passive_slots": [], "power_slots": [], "passive_items": {}, "power_items": {}, "passive_capacity": 1, "power_capacity": 1}
+	survivor_roster = SurvivorRosterManagerData.new(catalog)
 	var choice: Resource = catalog.by_id(catalog.specializations, specialization)
 	if choice != null:
 		grant_effect("passive", choice.passive_id)
@@ -45,7 +49,27 @@ func new_run(seed_value: int = 0, specialization: String = "combat", fixture_tem
 		data.roster[id] = {"template": template, "level": 1, "current_level": 1, "current_xp": 0, "total_xp": 0, "xp_to_next_level": SurvivorProgressionData.xp_required_for_level(1)}
 		weapon_inventory.add_weapon(WeaponInstanceData.from_dict({"uid": uid, "kind": catalog.start_rules.starting_weapons[template]}))
 		data.equipment[id] = uid
+	survivor_roster.sync_members(data.members)
+	data.survivor_states = survivor_roster.to_state()
 	_prepare_day()
+
+func roster_manager() -> SurvivorRosterManager:
+	return survivor_roster
+
+func discover_survivor(id: String) -> bool:
+	var changed := survivor_roster.discover_survivor(id)
+	if changed:
+		data.survivor_states = survivor_roster.to_state()
+	return changed
+
+func recruit_survivor(id: String) -> bool:
+	var changed := survivor_roster.recruit_survivor(id)
+	if changed:
+		data.survivor_states = survivor_roster.to_state()
+	return changed
+
+func is_survivor_recruited(id: String) -> bool:
+	return survivor_roster.is_recruited(id)
 
 func member_template(id: String) -> Resource:
 	return catalog.by_id(catalog.survivors, str(data.roster.get(id, {}).get("template", id)))
@@ -418,6 +442,12 @@ func valid_state(state: Dictionary) -> bool:
 	# JSON numbers are floats; Array.has uses strict Variant types.
 	if (state.get("version") != 2 and state.get("version") != 3 and state.get("version") != 4 and state.get("version") != 5) or not state.get("roster") is Dictionary:
 		return false
+	if state.has("survivor_states") and not state.survivor_states is Dictionary:
+		return false
+	if state.has("survivor_states"):
+		var roster_probe := SurvivorRosterManagerData.new(catalog)
+		if not roster_probe.restore_state(state.survivor_states):
+			return false
 	if not _nonnegative(state.get("initial_count")) or state.initial_count != state.roster.size() or state.roster.is_empty():
 		return false
 	var choice: Resource = catalog.by_id(catalog.specializations, str(state.get("specialization", "invalid")))
@@ -554,6 +584,7 @@ func restore(state: Dictionary) -> bool:
 	if not valid_state(compatible_state):
 		return false
 	data = compatible_state.duplicate(true)
+	survivor_roster = SurvivorRosterManagerData.new(catalog, data.get("survivor_states", {}))
 	data.selected_party = data.get("selected_party", data.members).duplicate()
 	data.selected_action = str(data.get("selected_action", ""))
 	if data.version == 1:
@@ -574,6 +605,8 @@ func restore(state: Dictionary) -> bool:
 		data.version = 3
 	_normalize_weapons(data)
 	_ensure_progression_fields()
+	survivor_roster.sync_members(data.members)
+	data.survivor_states = survivor_roster.to_state()
 	data.version = 5
 	for category: String in ["passive", "power"]:
 		data[category + "_capacity"] = int(data[category + "_capacity"])
