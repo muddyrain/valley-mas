@@ -51,7 +51,8 @@ func verify_local_seed(seed_value: int) -> void:
 	verify_equal_markers(mission, map)
 	var displacement: Vector3 = map.follow_center - center
 	check(displacement.length() > 1.0, "Squad moves through actual navigation")
-	check(map.world_to_minimap(fixed_world).is_equal_approx(original_projection - Vector2(displacement.x, displacement.z) * scale_before), "Ground scrolls by actual squad displacement")
+	var expected_projection: Vector2 = original_projection - Vector2(displacement.x, displacement.z) * scale_before
+	check(map.world_to_minimap(fixed_world).distance_to(expected_projection) <= 1.1, "Ground scrolls by actual squad displacement with pixel snapping")
 	check(map.static_layer.commands == cached_commands and map.static_build_count == builds, "Movement translates cached world without rebuilding")
 	check(map.map_scale == scale_before, "Movement cannot zoom out to fit Town")
 	verify_roster_changes(mission, map)
@@ -68,11 +69,12 @@ func verify_follow(mission: Node3D, map: Control) -> void:
 	check(map.minimap_mode == "LOCAL_FOLLOW" and map.center_source == "squad_center", "Only squad center drives local follow")
 	check(map.follow_center.is_equal_approx(mission.squad_center()), "Center is the average of living expedition roster")
 	check(map.world_to_minimap(map.follow_center).is_equal_approx(map.minimap_content_rect.get_center()), "Squad is centered in local window")
-	check(is_equal_approx(map.minimap_content_rect.size.x / map.map_scale, 70.0) and is_equal_approx(map.minimap_content_rect.size.y / map.map_scale, 70.0), "Visible world stays 70 by 70 meters")
+	var maximum_world_extent: float = maxf(map.minimap_content_rect.size.x, map.minimap_content_rect.size.y) / map.map_scale
+	check(is_equal_approx(maximum_world_extent, 70.0), "Minimap keeps the 70m tactical extent on the long axis while filling the viewport")
 	check(map.world_clip.clip_contents, "World draw is clipped to local map")
 	var sample: Vector3 = mission.runtime_data.mission_poi
 	var transformed: Vector2 = map.world_clip.position + map.static_layer.position + Vector2(sample.x, sample.z) * map.static_layer.scale
-	check(transformed.is_equal_approx(map.world_to_minimap(sample)), "Cached geometry transform and marker projection agree")
+	check(transformed.distance_to(map.world_to_minimap(sample)) <= 1.1, "Cached geometry transform and snapped marker projection agree")
 
 func verify_equal_markers(mission: Node3D, map: Control) -> void:
 	var markers: Array = map.town_markers.filter(func(item: Dictionary) -> bool: return item.kind == "survivor")

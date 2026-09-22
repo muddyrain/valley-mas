@@ -816,6 +816,8 @@ func command_search(id: String, survivor: Node3D = null) -> bool:
 	# always passes the selected UI member explicitly.
 	if assigned == null and town_runtime_ready:
 		assigned = selected_search_member
+		if assigned == null or assigned.dead or assigned.boarding or assigned.inside_building or task_for(assigned) != null:
+			assigned = null
 	if assigned == null:
 		var best := INF
 		for member in living():

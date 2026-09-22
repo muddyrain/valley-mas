@@ -120,6 +120,7 @@ switch ($Mode) {
         Invoke-Engine @('--headless', '--script', 'tests/periodic_effect_runtime.gd')
         Invoke-Engine @('--headless', '--script', 'tests/minimap_survivor_marker_acceptance.gd')
         Invoke-Engine @('--headless', '--script', 'tests/town_phase_1_2_acceptance.gd')
+        Invoke-Engine @('--position', '-3000,-3000', '--resolution', '1280x720', '--audio-driver', 'Dummy', '--script', 'tests/town_phase_3a_capture.gd')
         Invoke-Engine @('--headless', '--script', 'tests/sur_004_emergency_care.gd')
         Invoke-Engine @('--headless', '--script', 'tests/sur_008_morale_boost.gd')
         Invoke-Engine @('--headless', '--script', 'tests/walkable_ground.gd')

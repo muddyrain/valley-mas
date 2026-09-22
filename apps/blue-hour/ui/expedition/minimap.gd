@@ -145,7 +145,10 @@ func uses_town_runtime() -> bool:
 	return is_instance_valid(mission) and mission.map_provider == "MEDIUM_TOWN_V1" and mission.runtime_data.has("minimap_geometry")
 
 func world_to_minimap(world_pos: Vector3) -> Vector2:
-	return map_origin + Vector2(world_pos.x, world_pos.z) * map_scale
+	return _snap_point(map_origin + Vector2(world_pos.x, world_pos.z) * map_scale)
+
+func _snap_point(point: Vector2) -> Vector2:
+	return Vector2(snappedf(point.x, 1.0), snappedf(point.y, 1.0))
 
 func world_to_overview(world_pos: Vector3, content_rect: Rect2) -> Vector2:
 	# Retain the whole-Town projection as data support, without a Full Map UI.
@@ -181,15 +184,17 @@ func _sync_town() -> void:
 		_cached_size = size
 		_area = Rect2(Vector2(22, 40), (size - Vector2(44, 66)).max(Vector2.ONE))
 		var available: Rect2 = Rect2(_area.position + Vector2(2, 2), (_area.size - Vector2(4, 30)).max(Vector2.ONE))
-		var side: float = minf(available.size.x, available.size.y)
-		minimap_content_rect = Rect2(available.get_center() - Vector2.ONE * side * .5, Vector2.ONE * side)
+		# Fill the framed viewport. The local square is cropped by the clip rather
+		# than leaving side gutters when the HUD container is wider than tall.
+		minimap_content_rect = available
 		marker_rect = minimap_content_rect
 		world_clip.position = minimap_content_rect.position
 		world_clip.size = minimap_content_rect.size
 		world_clip.queue_redraw()
 	follow_center = mission.squad_center()
-	map_scale = minimap_content_rect.size.x / (local_world_extent * 2.0)
+	map_scale = maxf(minimap_content_rect.size.x, minimap_content_rect.size.y) / (local_world_extent * 2.0)
 	map_origin = minimap_content_rect.get_center() - Vector2(follow_center.x, follow_center.z) * map_scale
+	map_origin = _snap_point(map_origin)
 	static_layer.scale = Vector2.ONE * map_scale
 	static_layer.position = map_origin - world_clip.position
 	if source == cached_source:
@@ -302,6 +307,8 @@ func _update_town_markers() -> void:
 		var site: Dictionary = mission.city.sites[id]
 		if not site.discovered or id == poi_id:
 			continue
+		if not minimap_content_rect.has_point(world_to_minimap(site.spec.entry)):
+			continue
 		var texture: Texture2D = _site_marker_texture(id, site)
 		_append_town_marker("site:" + id, site.spec.entry, texture, 18.0, "site")
 
@@ -316,6 +323,8 @@ func _site_marker_texture(id: String, site: Dictionary) -> Texture2D:
 
 func _append_town_marker(id: Variant, world: Vector3, texture: Texture2D, diameter: float, kind: String = "landmark") -> void:
 	var anchor: Vector2 = world_to_minimap(world)
+	if kind == "site" and not minimap_content_rect.has_point(anchor):
+		return
 	var inset: Rect2 = marker_rect.grow(-diameter * .5 - MARKER_MARGIN)
 	var bearing: Vector2 = anchor - minimap_content_rect.get_center()
 	var edge: bool = not minimap_content_rect.has_point(anchor)

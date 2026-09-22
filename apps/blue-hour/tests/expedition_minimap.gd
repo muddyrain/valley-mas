@@ -66,6 +66,8 @@ func run() -> void:
 		var map: Control = app.hud.minimap
 		map._process(0.0)
 		verify_map(mission, map, seed_value)
+		if seed_value == 4101:
+			verify_polish(mission, map)
 		var geometry: String = var_to_str(mission.runtime_data.minimap_geometry).sha256_text()
 		check(geometry != previous_geometry, "Seed %d has its own geometry" % seed_value)
 		previous_geometry = geometry
@@ -166,11 +168,54 @@ func verify_projection(map: Control) -> void:
 	check(map.world_to_overview(origin, map.minimap_content_rect) == a, "Overview projection deterministic")
 	check(a.distance_to(map.world_to_overview(origin + Vector3.RIGHT, map.minimap_content_rect)) > 0, "Positive overview scale")
 	check(map.world_to_minimap(map.follow_center).is_equal_approx(map.minimap_content_rect.get_center()), "HUD projects squad center to local center")
+	var expected: Rect2 = Rect2(map._area.position + Vector2(2, 2), (map._area.size - Vector2(4, 30)).max(Vector2.ONE))
+	check(map.minimap_content_rect == expected, "Minimap content fills the complete framed viewport")
+	check(map.world_clip.size == expected.size, "Minimap clip matches the full content viewport")
+	var snapped: Vector2 = map.world_to_minimap(map.follow_center + Vector3(0.013, 0, 0.017))
+	check(snapped == Vector2(snappedf(snapped.x, 1.0), snappedf(snapped.y, 1.0)), "Minimap projection snaps markers to whole pixels")
+
+func verify_polish(mission: Node3D, map: Control) -> void:
+	var outside_id: String = ""
+	var farthest: float = -1.0
+	for id: String in mission.city.sites:
+		var site: Dictionary = mission.city.sites[id]
+		if site.vehicle:
+			continue
+		var distance: float = map.world_to_minimap(site.spec.entry).distance_to(map.minimap_content_rect.get_center())
+		if distance > farthest:
+			farthest = distance
+			outside_id = id
+	mission.city.sites[outside_id].discovered = true
+	map._process(0.0)
+	var outside_marker: bool = map.town_markers.any(func(item: Dictionary) -> bool: return str(item.id) == "site:" + outside_id)
+	check(not outside_marker or map.minimap_content_rect.has_point(map.world_to_minimap(mission.city.sites[outside_id].spec.entry)), "Out-of-range building marker is hidden until it re-enters")
+	var candidates: Array[String] = []
+	for id: String in mission.city.sites:
+		var site: Dictionary = mission.city.sites[id]
+		if site.vehicle or id == outside_id:
+			continue
+		if mission.city.path(mission.squad_center(), site.spec.entry).is_empty():
+			continue
+		site.discovered = true
+		site.spec.search_status = "RESOLVED_REACHABLE"
+		candidates.append(id)
+		if candidates.size() == 2:
+			break
+	check(candidates.size() == 2, "Two reachable building targets are available for parallel search")
+	if candidates.size() == 2:
+		check(mission.command_search(candidates[0]), "First survivor accepts first building search")
+		check(mission.command_search(candidates[1]), "Second survivor accepts second building search")
+		var workers: Array[int] = []
+		for id: String in candidates:
+			workers.append(mission.search_tasks[id].worker.get_instance_id())
+		check(mission.search_tasks.size() == 2 and workers[0] != workers[1], "Parallel searches use distinct survivors without a global lock")
+		mission.command_recall_all()
 
 func verify_markers(mission: Node3D, map: Control) -> void:
 	var discovered: int = 0
 	for id: String in mission.city.sites:
-		if mission.city.sites[id].discovered and id != str(mission.runtime_data.mission_poi_id):
+		var site: Dictionary = mission.city.sites[id]
+		if site.discovered and id != str(mission.runtime_data.mission_poi_id) and map.minimap_content_rect.has_point(map.world_to_minimap(site.spec.entry)):
 			discovered += 1
 	check(map.town_markers.size() == mission.living().size() + 2 + discovered, "All survivors, Arrival, POI and discovered sites visible")
 	for i: int in map.town_markers.size():

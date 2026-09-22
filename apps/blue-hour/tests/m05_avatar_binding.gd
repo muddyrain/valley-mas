@@ -31,14 +31,15 @@ func run() -> void:
 		_check(str(portrait.texture.resource_path).begins_with(AVATAR_ROOT + survivor_id + "_"), survivor_id + " roster avatar is ID-bound")
 		_check(portrait.stretch_mode == TextureRect.STRETCH_KEEP_ASPECT_COVERED, survivor_id + " roster avatar uses center crop")
 		_check(not entry.get_node("Fallback").visible, survivor_id + " does not show fallback")
+	_check(app.campaign.discover_survivor("SUR_012"), "SUR_012 can be discovered before detail avatar validation")
+	_check(app.campaign.recruit_survivor("SUR_012"), "SUR_012 can be recruited before detail avatar validation")
+	hud.refresh_roster()
+	await _frames(2)
 
-	var entry_001 := roster.find_child("SurvivorEntry_SUR_001", true, false) as Button
-	var entry_002 := roster.find_child("SurvivorEntry_SUR_002", true, false) as Button
-	var entry_012 := roster.find_child("SurvivorEntry_SUR_012", true, false) as Button
-	for selection: Button in [entry_001, entry_002, entry_012]:
-		selection.emit_signal("pressed")
+	var selection_ids: Array[String] = ["SUR_001", "SUR_002", "SUR_012"]
+	for selected_id: String in selection_ids:
+		roster.select_survivor(selected_id)
 		await _frames(2)
-		var selected_id := str(selection.name).trim_prefix("SurvivorEntry_")
 		var detail_portrait := detail.get_node("HeaderPanel/PortraitContainer/HalfPortrait") as TextureRect
 		_check(detail.survivor_id == selected_id, selected_id + " detail selection uses Survivor ID")
 		_check(detail_portrait.texture != null, selected_id + " detail avatar texture exists")
