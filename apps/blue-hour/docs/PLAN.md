@@ -1401,6 +1401,14 @@ M03: TECHNICALLY COMPLETE；Town Structure: FROZEN。停止于人工视觉审核
 - [x] Open 0.30 秒，Close 0.22 秒，Switch 0.06 秒退出 + 0.10 秒进入；隔离面板转场专项通过。
 - [ ] Main/Campaign 原生专项受当前工作区 `maps/exploration.gd` 解析错误阻断；隔离 Detail/Roster capture 已生成，不能代替完整 Camp 流程验收。详见 [V2.1 交付报告](reports/Camp_Survivor_Panel_V2_1_Report.md)。
 - [ ] Windows 完整 build 与独立程序启动需在修复现有地图脚本解析错误和 Camp 旧 HUD runtime 门禁后执行。
+
+## 2026-09-23：Survivor Definition 数据化 V1
+
+- [x] `SurvivorDefinition` 接入四维 1–100 `base_stats`、TraitData `starting_trait` 和 WeaponDefinition 引用 `starting_equipment`；Profile 仍只保存叙事资料，Runtime 成长状态继续由 Campaign 持有。
+- [x] 12 个正式定义均以 `survivor_id` 关联 Profile，具有正式 Portrait / Model 路径、英文内部 role tag、四维属性、TraitData 与初始武器引用；新开局装备改从所选 Definition 读取。
+- [x] 新增 `tests/survivor_definition_data.gd`（195 项）并接入标准 Windows build；Roster、M05 详情、招募、Trait、开局基础和目录规则回归通过。
+- [ ] 完整 Windows build 受工作区现有 `tests/camp_ui_runtime.gd` 的 `member_buttons` 旧引用及左侧能力栏断言阻断；`new_run_flow` 的搜索点/成长持久化断言也在当前地图运行失败。独立 EXE 未生成或验证。详见 [Survivor Definition 数据化 V1 报告](reports/2026-09-23_survivor_definition_data_v1_report.md)。
+
 ## 2026-09-22：蓝时归航 Expedition Map Phase 1 + Phase 2
 
 - [x] MiniMap 正式化：移除地图名、版本、Seed、Block ID 和 Debug Label 绘制路径；正式地图只保留地图几何、幸存者、POI、蓝时号和已发现地点标记。
@@ -1420,3 +1428,125 @@ M03: TECHNICALLY COMPLETE；Town Structure: FROZEN。停止于人工视觉审核
 - [ ] 本机没有 Blender 4.x，本次 GLB 由无依赖程序化 fallback 生成；`.blend` 源文件和 Blender 侧复导出需在安装 Blender 的工作站完成。完整视觉套件仍受既有 Expedition Visual 24 项旧 HUD/纹理门禁影响。
 
 详见 [Phase 3A 街道道具报告](MAP_PHASE_3A_STREET_PROP_PACK_REPORT.md)。
+
+## 2026-09-23：Expedition Map Phase 3B Blender City Props
+
+- [x] 使用 Blender 5.2.1 LTS 生成 10 个正式城市道具 GLB 与独立 `.blend` 源；共享 ART_BIBLE 色板，无贴图依赖，396–904 tris/件；manifest 登记路径、实际面数、尺寸与材质。
+- [x] 10 项加入 World Asset Catalog；Urban Dressing 按 frontage、道路边缘、道路交叉口与高空线缆锚点确定性摆放，资源不带碰撞/搜索/玩法权重，总实例上限维持 96。
+- [x] 五个固定 Seed 均有招牌、遮阳棚、空调、候车亭、电线杆、电线、红绿灯、消防栓、纸箱与轻度破损广告牌；每张地图 84–89 个装饰实例。
+- [x] Godot 4.7.2 import、资产实例化与五 Seed 定向验收通过：27,687 项 / 0 failures。原生 capture 输出 30 张图，含五 Seed 总览与住宅、商业、工业、道路、Arrival 镜头。
+- [ ] Human Visual QA：待确认立面挂件与工业街面道具在全部 Seed 下的可读性；本轮截图为原生 Godot 地图捕获，不标记人工美术验收完成。
+
+资产规格、报告与截图索引见 [Phase 3B 报告](MAP_PHASE_3B_CITY_PROPS_REPORT.md)；10 件登记在 [MODEL_CATALOG](../art/MODEL_CATALOG.md)。
+
+## 2026-09-23：Expedition Map Phase 3C Anime Stylized Urban Dressing
+
+- [x] 本机 Blender 5.2.1 新增 24 个独立 Anime Stylized 城市道具，全部生成 GLB 与独立 `.blend`；124–916 tris/件、合计 10,340 tris，共享 ART_BIBLE V1 色板，无贴图和碰撞代理。
+- [x] 24 项登记至 `WorldAssetCatalog`；Urban Dressing 增加住宅、商业、道路、轻灾后与绿化小组规则，调整路侧基础设施频率，把总实例上限保持在 96。
+- [x] 5 Seed 确定性/分区/Arrival/非阻挡验收 `682 checks / 0 failures`；Phase 3A 兼容回归 `29,486 checks / 0 failures`。
+- [x] 原生 Town 场景捕获 11 张，包括五 Seed 总览、四个区域近景及疏密对比；正式 Expedition/HUD 捕获 MiniMap 和幸存者移动状态。
+- [ ] 人工美术视觉 QA 仍待确认；本轮截图不能替代人工对全部 Seed 的审美验收。完整 Windows Release build 与独立程序启动尚未执行。
+
+资产、摆放与性能说明见 [Phase 3C 报告](MAP_PHASE_3C_URBAN_DRESSING_REPORT.md)；V2 清单见 [MODEL_CATALOG](../art/MODEL_CATALOG.md)。
+
+## 2026-09-23：Expedition Map Phase 3D 街区密度与街道布局
+
+- [x] 住宅 frontage gap 从 2.8m 缩至 1.4m；Residential B 从 4.2m 缩至 2.1m；商业从 1.8–2.0m 缩至 1.1m；工业从 8m 缩至 4m。住宅小街块与混合街块调整为 3 栋起步，住宅地块 frontage 延长 12m；现有住宅资源复用上限从 4 提至 5，不新增建筑模型。
+- [x] 修正逐栋建筑选型时重复扣除整排空隙的问题；随机 Seed 4101–4105 稳定生成 57 栋建筑，住宅/商业/工业分别为 33/19/4。街区通行连通，入口仍朝向分配道路。
+- [x] Phase 3D 验收 445 项零失败；Town Urban Fabric 152,972 项零失败；建筑入口 45,422 项零失败；Phase 3C Props 684 项零失败。无建筑/地块重叠和道路碰撞回归。
+- [x] 生成 5 Seed Town 俯视图、生产 Expedition 全局/街景图、MiniMap 独立截图；MiniMap 无 Medium Town V1。截图位于 `test-output/town-phase-3d-capture/`。
+- [ ] Release build 被工作区既有 Camp UI 门禁阻断：`camp_hud_root.gd` 缺少 `member_buttons` 且左侧能力栏断言失败；本阶段未改 Camp UI，独立程序启动未执行。全 Seed 人工美术验收仍待确认。旧 Phase 1.2 MiniMap 源码断言仍把幸存者名字提示 `display_name` 误判为地图名，本阶段未改 MiniMap。
+
+详见 [Phase 3D 报告](MAP_PHASE_3D_TOWN_DENSITY_REPORT.md)。
+
+## 2026-09-23：Weapon Contract Freeze Phase 1
+
+- [x] 冻结 `WeaponSubtype`、`WeaponModifierData`、`WeaponUpgradeData`、`WeaponInstance` 扩展和品质/存档迁移契约；兼容旧 `weapon_type`、`kind` 存档键及 rarity ordinal。
+- [x] 契约依据现有 canonical weapon ID 显式映射 subtype；旧 `LONG_GUN` 不推断细分类。Campaign v5→v6 迁移仅为后续建议，本阶段未执行。
+- [x] 新增设计报告与交付记录并同步本计划；没有修改游戏代码、武器资源、存档、UI、数值或战斗流程。纯文档阶段无需 Godot build。
+- [ ] 后续实施需按冻结顺序单独立项：subtype 数据、Modifier/Upgrade Resource、实例扩展与 v5→v6 迁移；每步先补兼容和回归验收。
+
+契约与实现边界见 [Weapon Contract Freeze Phase 1 报告](audit/weapon/weapon_contract_freeze_phase1_report.md)。
+
+## 2026-09-23：Weapon ModifierData Resource 化 Phase W2-1
+
+- [x] 六项既有 Modifier 迁为独立 `WeaponModifierData` `.tres`，保留原 modifier ID 和倍率；规则由 `WeaponModifierRegistry` 加载并校验重复 ID。
+- [x] `WeaponModifiers` 保留候选筛选与属性应用兼容 API；图鉴名称/说明改读 Resource。没有修改 WeaponDefinition、WeaponInstance 存档结构、武器数值、战斗链路或 VFX。
+- [x] Weapon System 451、Weapon Combat Phase 1A 11、Combat VFX Phase 1B 25 项通过；Expedition Combat Capture 375 帧/4 张截图/0 失败。Windows Release 导出、独立启动及内嵌包武器系统/武器视觉/战斗动画专项通过。
+- [ ] `run.ps1 build` 前置的 `survivor_command` 仍有 “Line follows the moving survivor's feet” 失败；完整预构建测试流水线未通过，本轮未改该无关问题。
+- [ ] Rarity Profile、UpgradeData、升级选择和随机升级抽取仍待后续阶段实现。
+
+实现与回归结果见 [Weapon ModifierData W2-1 报告](audit/weapon/weapon_modifierdata_resource_phase_w2_1_report.md)。
+
+## 2026-09-23：Expedition MiniMap Projection Stability V3
+
+- [x] World→MiniMap 投影统一改为 floor 像素取整；保持建筑/幸存者/车辆固定锚点和偏移、marker ID 记录复用、出界隐藏与重入恢复。
+- [x] MiniMap Content 与 World Clip 同尺寸覆盖完整内框；提供可开关的坐标/可见状态 Debug 摘要，不触碰 Camera 或其他玩法系统。
+- [x] MiniMap 2318 项、Local Follow 2297 项、1600×900 原生 300 帧捕获 21432 项均通过；10 秒录屏及静态截图完成关键帧人工检查。
+
+详见 [Projection Stability V3 报告](EXPEDITION_MINIMAP_PROJECTION_STABILITY_V3.md)。
+
+## 2026-09-23：Survivor Animation Integration Phase 1
+
+- [x] 检查 Xia Zhiyao / Su Wanxing Runtime GLB：共享冻结 `BH_Humanoid_Rig_v1`，23 根骨骼；不复制角色骨架或改角色模型。
+- [x] 11 个用户提供 FBX 归档在 Survivor 动画源目录；Blender 重定向到既有 22 个动画骨骼并导出运行时 GLB，按 locomotion / combat / reaction 分类。
+- [x] 建立包含 11 个动作的 `AnimationLibrary` 与 10 个状态节点的基础 `AnimationTree`，增加 Xia Zhiyao 预览场景和专项验证；未接入武器/敌人/玩法逻辑。
+- [x] Windows Godot 4.7.2 Headless 导入完成；Xia 骨架、11 个动画、状态播放与动作姿势变化共 289 项结构/运行检查通过。
+- [ ] 原生 1600×900 运行时截图与 10 秒预览视频已生成，但 Idle / Rifle Idle 肩臂姿态不自然，Retarget 视觉验收未通过；AnimationTree 编辑器截图缺失。需先修正重定向再完成验收。本轮运行环境另有既存 `data/weapon_modifier_registry.gd` 缺失导致主入口脚本解析失败，不影响独立动画专项。
+
+详见 [Survivor Animation Integration Phase 1 报告](reports/2026-09-23_survivor_animation_integration_phase_1_report.md)。
+
+## 2026-09-23：Survivor Animation Retarget Pose Correction
+
+- [x] 保持冻结的 `BH_Humanoid_Rig_v1`、夏知遥模型与玩法不变；修正 Blender 烘焙为逐骨父级局部 pose delta，并在 source/canonical 父骨 rest frame 间转换。
+- [x] 为 `survivor_idle`、`rifle_idle`、`rifle_run` 增加上臂/前臂/手部逐动作旋转补偿；仅重导出这三个动画。
+- [x] Godot 4.7.2 重新导入并重建共享 AnimationLibrary；动画专项 298 checks / 0 failures。
+- [ ] 视觉 QA 未通过：Idle 肩臂显著下垂得到改善；Rifle Idle 呈前收屈肘的持枪准备姿态，但未带枪网格，接触关系未验；Rifle Run 仍有不自然的抬臂。三态截图与预览视频已生成，需继续校准并人工确认。
+
+详见 [Retarget Pose Correction 报告](reports/2026-09-23_survivor_animation_retarget_pose_correction_report.md)。
+
+## 2026-09-23：Survivor Animation Pose Calibration Phase 1.6
+
+- [x] 调试预览接入现有 K9 SMG GLB 与 long-gun attachment transform；不修改 WeaponDefinition、武器控制器或正式装备流程。
+- [x] 仅重烘焙 `survivor_idle`、`rifle_idle`、`rifle_run`，动画总数保持 11；Idle 上臂收拢并保留源呼吸曲线，Rifle 动作增加肩臂/手腕校正。
+- [x] Godot 4.7.2 导入及 AnimationTree 专项通过；三种带 SMG 预览视频已输出。
+- [ ] 视觉 QA 未通过：Rifle Idle 双手/枪托接触仍不准确且枪体遮脸；Rifle Run 左手未稳定托枪，手臂与枪体仍不一致。视频作为校准证据，不作为通过验收。
+
+详见 [Pose Calibration Phase 1.6 报告](reports/2026-09-23_survivor_animation_pose_calibration_phase_1_6_report.md)。
+
+## 2026-09-23：Weapon RarityProfile Resource 化 Phase W2-2
+
+- [x] 新增 Common / Uncommon / Rare / Epic / Legendary 五个 `WeaponRarityProfileData` Resource 与 `WeaponRarityRegistry`；注册表校验唯一 ID/tier、tier 对应、颜色格式和冻结槽位合同。
+- [x] `Equipment` 掉落权重、旧 Modifier 容量以及 Weapon Browser 品质文字/颜色改读 Profile；旧 rarity ordinal、SPECIAL→EPIC 映射和 WeaponInstance 存档结构保持兼容。当前等权掉落与每档旧 Modifier 数量不变。
+- [x] Rarity 专项 32 项、Weapon System 474 项通过；Expedition Combat Capture 375 帧 / 4 截图 / 0 失败；Godot 4.7.2 Resource 导入通过。
+- [ ] `allowed_modifier_rarity` 已入 Profile 并校验稳定 rarity ID；当前 `WeaponModifierData` 没有 rarity 分类，故本阶段不据此过滤候选，待后续契约具备该分类后再接入。
+- [ ] 未实现 UpgradeData、升级 UI、Legendary 掉落或新特效；没有修改武器数值、WeaponDefinition、WeaponInstance 或战斗/VFX 链路。
+
+实现与兼容细节见 [Weapon RarityProfile W2-2 报告](audit/weapon/weapon_rarityprofile_resource_phase_w2_2_report.md)。
+
+## 2026-09-23：Weapon UpgradeData + Candidate Phase W2-3
+
+- [x] 新增 `WeaponUpgradeData` / `WeaponUpgradeRegistry` 与 P9 Level 2 三个候选数据；支持武器专属、通用和路线类型、Modifier addition、stat preview、requirements、权重及冲突组。
+- [x] 新增无副作用 `UpgradeCandidateGenerator`：按下一等级、武器身份、标签、rarity、已有 Modifier/max stack、special-effect slots 和冲突过滤；使用显式 RNG 按权重无放回生成最多 3 项。
+- [x] 当前 `WeaponInstance` 与 Campaign v5 存档保持原样；未来字段及 v5→v6 递归迁移方案写入报告，没有接入选取/应用流程、UI 或战斗。
+- [x] Upgrade Candidate 35、Weapon System 474、Rarity Profile 32 项通过；Expedition Capture 运行完 375 帧并产出 4 张截图。
+- [ ] 全项目 Godot import 受现有 MiniMap `_draw_survivor_marker` 参数不匹配阻断；Expedition capture 同时记录 enemy transform 非有限值和 camera 方向警告，虽 harness failure 列表为 0，不能视为干净的视觉通过。
+
+实现、实例存档规划、候选接口和当前限制见 [Weapon UpgradeData W2-3 报告](audit/weapon/weapon_upgrade_data_phase_w2_3_report.md)。
+
+## 2026-09-23：Expedition MiniMap V4 Exploration & Information Layer
+
+- [x] 以 provider / mission type / seed / Town source signature 隔离探索存档；恢复已探索记忆，进入时重建当前视野，角色移动持续揭示并周期保存。
+- [x] MiniMap 使用原 Canvas Draw 与 V3 稳定投影；未知区域实色遮挡并隐藏建筑/车辆/POI marker，已探索地点按住宅、商业、医疗、工业分类显示；近距离幸存者聚合并可展开名字。
+- [x] 危险层只使用当前可见感染者与近期可见噪音；新地点用短暂发现提示，不伪造资源奖励；未引入新 PNG 或独立 marker 节点。
+- [x] Exploration 9、MiniMap 2347、Local Follow 2286 项及原生 1600×900 起始/移动/危险/小队展开捕获 6 项均通过；截图见 [V4 验收报告](EXPEDITION_MINIMAP_V4_EXPLORATION_INFORMATION_LAYER.md)。
+- [ ] 全 Seed 人工美术验收及地图事件危险数据源仍待后续；本阶段不实现发现奖励或独立资源点。
+
+## 2026-09-24：Weapon Upgrade Apply + Persistence Phase W2-4
+
+- [x] 新增事务式 `WeaponUpgradeApplier`：校验等级、武器身份、候选 requirements、Modifier 可用性/tag/max stack/conflict group 与稀有度特殊效果槽；成功返回已完整构造的实例副本，失败不修改输入实例。
+- [x] `WeaponInstance` 增加 level、upgrade_history、seed、pending_upgrade、instance_schema 运行态字段；默认 `to_dict()` 保持 Campaign v5 五键格式，`to_dict(true)` 提供显式扩展 payload，旧实例缺省 schema 0。
+- [x] Equipment 从升级历史重建派生属性；共用 WeaponDefinition 不被修改。Campaign、SaveStore 和战斗链路未接入升级选择或存档迁移。
+- [x] W2-4 专项 55、Weapon System 474、Rarity Profile 32、Save/Catalog 9、Weapon Combat Phase 1A 11、Combat Animations 3443、Combat Animation Mission 47 项均通过；Campaign v5→v6 迁移仍待后续阶段处理。
+
+报告：[Weapon Upgrade Apply + Persistence W2-4](audit/weapon/weapon_upgrade_apply_persistence_phase_w2_4_report.md)
