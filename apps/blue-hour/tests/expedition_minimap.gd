@@ -4,6 +4,7 @@ extends SceneTree
 const App = preload("res://core/main.gd")
 const Generator = preload("res://maps/town/town_generator.gd")
 const Minimap = preload("res://ui/expedition/minimap.gd")
+const ExplorationStateData = preload("res://maps/exploration_state.gd")
 const OUT: String = "res://test-output/expedition-integration-e01-5"
 var failures: Array[String] = []
 var checks: int = 0
@@ -18,6 +19,7 @@ class SeededApp extends App:
 		config.map_seed = fixture_seed
 		config.seed = fixture_seed
 		config.map_provider = fixture_provider
+		config.exploration_state_namespace = "test-%d" % OS.get_process_id()
 		return config
 
 func _initialize() -> void:
@@ -28,6 +30,21 @@ func check(value: bool, message: String) -> void:
 	if not value:
 		failures.append(message)
 		push_error(message)
+
+func verify_exploration_state() -> void:
+	var identity: String = "minimap-v4-test:%d" % Time.get_ticks_usec()
+	var state: RefCounted = ExplorationStateData.new()
+	state.load_map(identity)
+	var fresh: Vector2 = Vector2(10.0, -4.0)
+	check(state.state_at(fresh) == 0, "New exploration profile starts with unknown cells")
+	var sources := PackedVector2Array([Vector2.ZERO])
+	check(state.update_visibility(sources, 5.0), "Exploration records newly revealed cells")
+	check(state.state_at(Vector2.ZERO) == 2 and state.state_at(Vector2(12, 0)) == 0, "Visible and unknown cell states remain distinct")
+	check(state.save(), "Exploration state saves to its map profile")
+	var restored: RefCounted = ExplorationStateData.new()
+	restored.load_map(identity)
+	check(restored.state_at(Vector2.ZERO) == 1, "Reload restores explored memory without preserving live visibility")
+	check(restored.state_at(fresh) == 0, "Reload leaves never-visited cells unknown")
 
 func create_app(seed_value: int, provider: String = "MEDIUM_TOWN_V1") -> Node:
 	var app: Node = SeededApp.new()
@@ -55,6 +72,7 @@ func run() -> void:
 	var probe: Control = Minimap.new()
 	check(probe.has_method("world_to_minimap"), "Minimap exposes the common runtime projection")
 	probe.free()
+	verify_exploration_state()
 	if not failures.is_empty():
 		finish()
 		return
@@ -167,12 +185,15 @@ func verify_projection(map: Control) -> void:
 	check(is_equal_approx((b.x - a.x) / bounds.size.x, (b.y - a.y) / bounds.size.y), "Aspect ratio preserved")
 	check(map.world_to_overview(origin, map.minimap_content_rect) == a, "Overview projection deterministic")
 	check(a.distance_to(map.world_to_overview(origin + Vector3.RIGHT, map.minimap_content_rect)) > 0, "Positive overview scale")
-	check(map.world_to_minimap(map.follow_center).is_equal_approx(map.minimap_content_rect.get_center()), "HUD projects squad center to local center")
-	var expected: Rect2 = Rect2(map._area.position + Vector2(2, 2), (map._area.size - Vector2(4, 30)).max(Vector2.ONE))
+	var center_projection: Vector2 = map._snap_point(map.map_origin + Vector2(map.follow_center.x, map.follow_center.z) * map.map_scale)
+	check(map.world_to_minimap(map.follow_center) == center_projection, "HUD projects squad center through the shared floor-rounded mapping")
+	var expected: Rect2 = Rect2(map._area.position + Vector2(2, 2), (map._area.size - Vector2(4, 4)).max(Vector2.ONE))
 	check(map.minimap_content_rect == expected, "Minimap content fills the complete framed viewport")
 	check(map.world_clip.size == expected.size, "Minimap clip matches the full content viewport")
 	var snapped: Vector2 = map.world_to_minimap(map.follow_center + Vector3(0.013, 0, 0.017))
-	check(snapped == Vector2(snappedf(snapped.x, 1.0), snappedf(snapped.y, 1.0)), "Minimap projection snaps markers to whole pixels")
+	check(snapped == Vector2(floorf(snapped.x), floorf(snapped.y)), "Minimap projection floors markers to whole pixels")
+	var raw_projection: Vector2 = map.map_origin + Vector2(map.follow_center.x + 0.37, map.follow_center.z + 0.83) * map.map_scale
+	check(map._snap_point(raw_projection) == Vector2(floorf(raw_projection.x), floorf(raw_projection.y)), "Projection uses floor rather than nearest-pixel rounding")
 
 func verify_polish(mission: Node3D, map: Control) -> void:
 	var outside_id: String = ""
@@ -186,9 +207,31 @@ func verify_polish(mission: Node3D, map: Control) -> void:
 			farthest = distance
 			outside_id = id
 	mission.city.sites[outside_id].discovered = true
+	var outside_cell: Vector2i = Vector2i((Vector2(mission.city.sites[outside_id].spec.entry.x,
+		mission.city.sites[outside_id].spec.entry.z) / ExplorationStateData.CELL_SIZE).floor())
+	map._exploration_state.visible_cells["%d:%d" % [outside_cell.x, outside_cell.y]] = true
 	map._process(0.0)
-	var outside_marker: bool = map.town_markers.any(func(item: Dictionary) -> bool: return str(item.id) == "site:" + outside_id)
-	check(not outside_marker or map.minimap_content_rect.has_point(map.world_to_minimap(mission.city.sites[outside_id].spec.entry)), "Out-of-range building marker is hidden until it re-enters")
+	var outside_key: String = "site:" + outside_id
+	var pooled_marker: Dictionary = map.marker_pool[outside_key]
+	check(not bool(pooled_marker.visible), "Out-of-range marker record remains pooled as hidden")
+	var outside_visible: bool = false
+	for marker: Dictionary in map.town_markers:
+		outside_visible = outside_visible or str(marker.id) == outside_key
+	check(not outside_visible, "Out-of-range building marker is hidden")
+	var original_positions: Array[Vector3] = []
+	for member: Node3D in mission.survivors:
+		original_positions.append(member.position)
+		member.position = mission.city.sites[outside_id].spec.entry
+	map._process(0.0)
+	outside_visible = false
+	for marker: Dictionary in map.town_markers:
+		outside_visible = outside_visible or str(marker.id) == outside_key
+	check(outside_visible, "Building marker returns when it re-enters the viewport")
+	check(is_same(map.marker_pool[outside_key], pooled_marker), "Re-entering building reuses its marker record")
+	check(bool(pooled_marker.visible), "Re-entering marker updates its retained visibility state")
+	for index: int in mission.survivors.size():
+		mission.survivors[index].position = original_positions[index]
+	map._process(0.0)
 	var candidates: Array[String] = []
 	for id: String in mission.city.sites:
 		var site: Dictionary = mission.city.sites[id]
@@ -212,33 +255,72 @@ func verify_polish(mission: Node3D, map: Control) -> void:
 		mission.command_recall_all()
 
 func verify_markers(mission: Node3D, map: Control) -> void:
-	var discovered: int = 0
+	var expected_markers: int = mission.living().size() + 1
+	if int(mission.exploration.state_at(mission.runtime_data.mission_poi)) != mission.exploration.Visibility.UNEXPLORED:
+		expected_markers += 1
 	for id: String in mission.city.sites:
 		var site: Dictionary = mission.city.sites[id]
-		if site.discovered and id != str(mission.runtime_data.mission_poi_id) and map.minimap_content_rect.has_point(map.world_to_minimap(site.spec.entry)):
-			discovered += 1
-	check(map.town_markers.size() == mission.living().size() + 2 + discovered, "All survivors, Arrival, POI and discovered sites visible")
+		if id == str(mission.runtime_data.mission_poi_id) or int(mission.exploration.state_at(site.spec.entry)) == mission.exploration.Visibility.UNEXPLORED:
+			continue
+		var offset: Vector2 = Vector2(0, 6) if bool(site.get("vehicle", false)) else Vector2.ZERO
+		var point: Vector2 = map.world_to_minimap(site.spec.entry) + offset
+		var marker_bounds: Rect2 = Rect2(point - Vector2.ONE * 9.0, Vector2.ONE * 18.0)
+		if map.marker_rect.encloses(marker_bounds):
+			expected_markers += 1
+	check(map.town_markers.size() == expected_markers, "Only explored sites and known landmarks are shown")
 	for i: int in map.town_markers.size():
 		var marker: Dictionary = map.town_markers[i]
 		check(marker.anchor.is_equal_approx(map.world_to_minimap(marker.world)), "Marker uses common mapping")
+		check(marker.anchor == Vector2(floorf(marker.anchor.x), floorf(marker.anchor.y)), "Marker projection has integer floor coordinates")
 		check(map.marker_rect.encloses(Rect2(marker.point - Vector2.ONE * marker.diameter * .5, Vector2.ONE * marker.diameter)), "Entire marker inside map")
 		if str(marker.id) == "arrival":
 			check(marker.world == mission.runtime_data.arrival_point, "Bus marker from runtime")
+			if not marker.edge:
+				check(marker.point == marker.anchor + marker.get("layout_offset", Vector2.ZERO), "Arrival marker preserves its stable layout offset")
 		elif str(marker.id) == "poi":
 			check(marker.world == mission.runtime_data.mission_poi, "Objective marker from runtime")
+			if not marker.edge:
+				check(marker.point == marker.anchor + marker.get("layout_offset", Vector2.ZERO), "Objective marker preserves its stable layout offset")
+		elif marker.kind == "vehicle":
+			var vehicle_site: Dictionary = mission.city.sites[str(marker.id).trim_prefix("site:")]
+			check(vehicle_site.discovered and marker.world == vehicle_site.spec.entry, "Vehicle marker reads its runtime interaction point")
+			check(marker.point == marker.anchor + marker.offset + marker.get("layout_offset", Vector2.ZERO), "Vehicle marker keeps its stable layout offset")
 		elif str(marker.id).begins_with("site:"):
 			var site: Dictionary = mission.city.sites[str(marker.id).trim_prefix("site:")]
 			check(site.discovered and marker.world == site.spec.entry, "Site marker uses discovered runtime interaction point")
+			check(marker.point == marker.anchor + marker.get("layout_offset", Vector2.ZERO), "Building marker keeps its stable layout offset")
 		elif marker.kind == "survivor":
 			check(marker.world == instance_from_id(marker.id).global_position, "Survivor marker reads live actor")
+			if not marker.edge:
+				check(marker.point == marker.anchor + marker.offset + marker.get("layout_offset", Vector2.ZERO), "Survivor marker keeps its stable layout offset")
 			check(marker.texture == null, "Survivor marker does not use an avatar texture")
-			check(not marker.has("selected"), "Survivor marker has no selection state")
+			check(marker.has("selected"), "Survivor marker carries selection state")
 			check(marker.has("moving") and marker.has("searching"), "Survivor marker carries behavior state")
-		else:
-			check(marker.world == instance_from_id(marker.id).global_position, "Survivor marker reads live actor")
-		for j: int in range(i):
-			var other: Dictionary = map.town_markers[j]
-			check(marker.point.distance_to(other.point) >= (marker.diameter + other.diameter) * .5 + 1.9, "Markers remain distinguishable")
+	var unknown_sites: int = 0
+	for id: String in mission.city.sites:
+		if int(mission.exploration.state_at(mission.city.sites[id].spec.entry)) == mission.exploration.Visibility.UNEXPLORED:
+			unknown_sites += 1
+	check(unknown_sites > 0, "Fixture contains unrevealed sites")
+	for marker: Dictionary in map.town_markers:
+		if str(marker.id).begins_with("site:"):
+			var site_id: String = str(marker.id).trim_prefix("site:")
+			check(int(mission.exploration.state_at(mission.city.sites[site_id].spec.entry)) != mission.exploration.Visibility.UNEXPLORED, "Unknown target has no marker")
+	check(map.survivor_clusters.size() > 0, "Nearby survivors are grouped")
+	map.cluster_expanded = true
+	map.queue_redraw()
+	check(map.cluster_expanded, "Survivor cluster can expand to names")
+	var prior: Dictionary = map.recent_discoveries.duplicate()
+	var candidate_id: String = ""
+	for id: String in mission.city.sites:
+		if not prior.has(id):
+			candidate_id = id
+			break
+	if not candidate_id.is_empty():
+		map.recent_discoveries[candidate_id] = true
+		var before_discovery: Dictionary = map.recent_discoveries.duplicate()
+		before_discovery.erase(candidate_id)
+		map._update_discovery_notice(before_discovery)
+		check(map.discovery_notice.begins_with("发现 ") and map.discovery_notice_left > 0.0, "New location discovery produces a short notice")
 
 func finish() -> void:
 	FileAccess.open(output_directory.path_join("report.json"), FileAccess.WRITE).store_string(JSON.stringify({"checks": checks, "failures": failures, "seeds": records, "human_runtime_qa": "PENDING"}, "\t"))

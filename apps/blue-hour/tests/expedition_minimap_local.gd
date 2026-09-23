@@ -26,6 +26,7 @@ func verify_local_seed(seed_value: int) -> void:
 	var center: Vector3 = map.follow_center
 	var scale_before: float = map.map_scale
 	var before: Array = map.town_markers.duplicate(true)
+	var pooled_records: Dictionary = map.marker_pool.duplicate()
 	for member: Node3D in mission.survivors:
 		app.hud.inspect_member(member)
 		map._process(0.0)
@@ -55,6 +56,8 @@ func verify_local_seed(seed_value: int) -> void:
 	check(map.world_to_minimap(fixed_world).distance_to(expected_projection) <= 1.1, "Ground scrolls by actual squad displacement with pixel snapping")
 	check(map.static_layer.commands == cached_commands and map.static_build_count == builds, "Movement translates cached world without rebuilding")
 	check(map.map_scale == scale_before, "Movement cannot zoom out to fit Town")
+	for marker_id: Variant in pooled_records:
+		check(is_same(map.marker_pool[marker_id], pooled_records[marker_id]), "Moving squad reuses retained marker records")
 	verify_roster_changes(mission, map)
 	verify_discovery(mission, map)
 	var start_usec: int = Time.get_ticks_usec()
@@ -68,7 +71,7 @@ func verify_local_seed(seed_value: int) -> void:
 func verify_follow(mission: Node3D, map: Control) -> void:
 	check(map.minimap_mode == "LOCAL_FOLLOW" and map.center_source == "squad_center", "Only squad center drives local follow")
 	check(map.follow_center.is_equal_approx(mission.squad_center()), "Center is the average of living expedition roster")
-	check(map.world_to_minimap(map.follow_center).is_equal_approx(map.minimap_content_rect.get_center()), "Squad is centered in local window")
+	check(map.world_to_minimap(map.follow_center).distance_to(map.minimap_content_rect.get_center()) < 1.5, "Squad is centered within the floor-rounded pixel cell")
 	var maximum_world_extent: float = maxf(map.minimap_content_rect.size.x, map.minimap_content_rect.size.y) / map.map_scale
 	check(is_equal_approx(maximum_world_extent, 70.0), "Minimap keeps the 70m tactical extent on the long axis while filling the viewport")
 	check(map.world_clip.clip_contents, "World draw is clipped to local map")
@@ -81,12 +84,11 @@ func verify_equal_markers(mission: Node3D, map: Control) -> void:
 	check(markers.size() == mission.living().size(), "Every alive expedition survivor has an icon")
 	for marker: Dictionary in markers:
 		check(marker.diameter == 18.0 and marker.texture == null, "Every survivor uses the same lightweight marker")
-		check(not marker.has("selected"), "Survivor markers have no selection state")
+		check(marker.has("selected"), "Survivor markers expose selected state")
 		check(marker.has("moving") and marker.has("searching"), "Survivor markers expose behavior state")
+		if not marker.edge:
+			check(marker.point == marker.anchor + Vector2(0, -6), "Survivor uses its fixed marker offset")
 		check(map.marker_rect.encloses(Rect2(marker.point - Vector2.ONE * 12, Vector2.ONE * 24)), "Survivor marker stays inside local map")
-		for other: Dictionary in markers:
-			if marker.id != other.id:
-				check(marker.point.distance_to(other.point) >= 24.0, "Equal icons do not hide one another")
 
 func marker_for(map: Control, id: Variant) -> Dictionary:
 	for marker: Dictionary in map.town_markers:
@@ -96,6 +98,10 @@ func marker_for(map: Control, id: Variant) -> Dictionary:
 
 func verify_edge_marker(map: Control, id: String) -> void:
 	var marker: Dictionary = marker_for(map, id)
+	if marker.is_empty():
+		check(map.exploration_state_at(map.mission.runtime_data.mission_poi) == map.mission.exploration.Visibility.UNEXPLORED,
+			"Unknown mission POI stays hidden after camera pan")
+		return
 	check(marker.edge, id + " is outside the local window")
 	var inset: Rect2 = map.marker_rect.grow(-marker.diameter * .5 - 3.0)
 	var point: Vector2 = marker.clamped_anchor
@@ -131,8 +137,12 @@ func verify_discovery(mission: Node3D, map: Control) -> void:
 	var previous_selection: String = mission.poi_selected_id
 	# Town has no E02 sites. These minimal existing-shape fixtures test the reveal boundary.
 	var entry: Vector3 = map.follow_center + Vector3(15, 0, 10)
-	for id: String in ["qa_known", "qa_hidden", "qa_target", "qa_search"]:
-		sites[id] = {"discovered": id != "qa_hidden", "spec": {"entry": entry}, "vehicle": false}
+	var hidden_entry: Vector3 = map.follow_center + Vector3(180, 0, 180)
+	for id: String in ["qa_known", "qa_target", "qa_search"]:
+		sites[id] = {"discovered": true, "spec": {"entry": entry}, "vehicle": false}
+	sites["qa_hidden"] = {"discovered": false, "spec": {"entry": hidden_entry}, "vehicle": false}
+	var explored_cell := Vector2i((Vector2(entry.x, entry.z) / ExplorationStateData.CELL_SIZE).floor())
+	map.mission.exploration.exploration_state.explored_cells["%d:%d" % [explored_cell.x, explored_cell.y]] = true
 	mission.poi_selected_id = "qa_target"
 	mission.search_tasks["qa_search"] = null
 	map._process(0.0)

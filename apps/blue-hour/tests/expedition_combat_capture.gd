@@ -28,6 +28,15 @@ var camera_size_override: float = 17.0
 var camera_focus_target: Node3D
 
 func _initialize() -> void:
+	for argument: String in OS.get_cmdline_user_args():
+		if not argument.begins_with("--output-dir="):
+			continue
+		var requested_directory := argument.trim_prefix("--output-dir=")
+		if not requested_directory.begins_with("res://test-output/") or ".." in requested_directory:
+			push_error("Capture output must stay inside res://test-output/")
+			quit(1)
+			return
+		output_dir = requested_directory
 	call_deferred("run")
 
 func run() -> void:

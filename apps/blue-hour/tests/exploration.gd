@@ -5,7 +5,8 @@ func run() -> void:
 	root.add_child(mission)
 	mission.set_physics_process(false)
 	var loadout: Array[String] = ["pistol", "smg"]
-	mission.setup(Catalog.new(), Ledger.new(), loadout, 20260912)
+	var empty_party: Array[String] = []
+	mission.setup(Catalog.new(), Ledger.new(), loadout, 20260912, null, empty_party, {"exploration_state_namespace": "exploration-test-%d" % OS.get_process_id()})
 	mission.director_enabled = false
 	mission.debug_clear_enemies()
 	var fog: Node = mission.exploration
