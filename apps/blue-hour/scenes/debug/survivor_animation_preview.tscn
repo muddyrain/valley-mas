@@ -1,0 +1,50 @@
+[gd_scene load_steps=7 format=3]
+
+[ext_resource type="PackedScene" path="res://assets/characters/xia_zhiyao/runtime/xia_zhiyao.glb" id="1_xia"]
+[ext_resource type="Script" path="res://survivors/survivor_animation_pipeline.gd" id="2_pipeline"]
+[ext_resource type="Script" path="res://scenes/debug/survivor_animation_preview.gd" id="3_preview"]
+
+[sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_preview"]
+sky_top_color = Color(0.117647, 0.164706, 0.203922, 1)
+sky_horizon_color = Color(0.521569, 0.521569, 0.490196, 1)
+ground_bottom_color = Color(0.117647, 0.133333, 0.121569, 1)
+ground_horizon_color = Color(0.254902, 0.278431, 0.25098, 1)
+
+[sub_resource type="Sky" id="Sky_preview"]
+sky_material = SubResource("ProceduralSkyMaterial_preview")
+
+[sub_resource type="Environment" id="Environment_preview"]
+background_mode = 2
+sky = SubResource("Sky_preview")
+ambient_light_source = 3
+ambient_light_color = Color(0.670588, 0.713726, 0.729412, 1)
+ambient_light_energy = 0.8
+
+[sub_resource type="PlaneMesh" id="GroundMesh"]
+size = Vector2(8, 8)
+
+[node name="SurvivorAnimationPreview" type="Node3D"]
+script = ExtResource("3_preview")
+
+[node name="Environment" type="WorldEnvironment" parent="."]
+environment = SubResource("Environment_preview")
+
+[node name="KeyLight" type="DirectionalLight3D" parent="."]
+rotation = Vector3(-0.698132, -0.523599, 0)
+light_energy = 2.2
+shadow_enabled = true
+
+[node name="Ground" type="MeshInstance3D" parent="."]
+position = Vector3(0, -0.04, 0)
+mesh = SubResource("GroundMesh")
+
+[node name="Camera3D" type="Camera3D" parent="."]
+position = Vector3(1.25, 1.05, 1.75)
+rotation = Vector3(-0.24, 0.62, 0)
+current = true
+
+[node name="XiaZhiyao" parent="." instance=ExtResource("1_xia")]
+position = Vector3(0, 0, 0)
+
+[node name="SurvivorAnimationPipeline" type="Node3D" parent="XiaZhiyao"]
+script = ExtResource("2_pipeline")
