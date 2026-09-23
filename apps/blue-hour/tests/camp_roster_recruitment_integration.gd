@@ -50,19 +50,29 @@ func run() -> void:
 	_check(str(entry_002.get_node("PortraitTexture").texture.resource_path) == "res://assets/characters/su_wanxing/portrait/avatar_square.png", "SUR_002 card uses Su Wanxing's character portrait")
 	_check(not detail.visible, "Default Camp view has no detail panel")
 	await _capture("camp-default-1600x900.png")
+	entry_001.mouse_entered.emit()
+	await create_timer(0.20).timeout
+	_check(is_equal_approx(entry_001.scale.x, 1.02) and is_equal_approx(entry_001.pivot_offset.y, entry_001.size.y), "Roster hover brightens and lifts from the portrait card baseline")
+	await _capture("camp-hover-1600x900.png")
+	entry_001.mouse_exited.emit()
+	await create_timer(0.20).timeout
 	roster.select_survivor("SUR_001")
 	await create_timer(0.35).timeout
 	_check(detail.survivor_id == "SUR_001" and detail.visible, "Detail opens from selected Survivor ID")
+	_check(is_equal_approx(entry_001.scale.x, 1.03) and is_equal_approx(entry_001.pivot_offset.y, entry_001.size.y * 0.5), "Selected roster card scales around its center with clear emphasis")
 	_check(detail.get_node("HeaderPanel/SurvivorName").text == "夏知遥", "Detail name follows selected ID")
 	_check(detail.get_node("HeaderPanel/SurvivorNameEn").text.contains("SUR_001") and detail.get_node("HeaderPanel/SurvivorNameEn").text.contains("Lv.1"), "Detail ID and level follow selected ID")
+	_check(detail.get_node("HeaderPanel/TraitBadge/Label").text == "探索专家", "SUR_001 has a concise exploration role tag")
 	_check(detail.get_node("TraitPanel/TraitName").text.contains("搜寻直觉"), "Detail Trait follows selected ID")
-	_check(catalog.by_id(catalog.profiles, "SUR_001").before_apocalypse.begins_with(detail.get_node("BackgroundPanel/BackgroundDescription").text.left(6)), "Detail narrative follows selected Profile ID")
+	_check(not detail.get_node("BackgroundPanel").visible and not detail.get_node("HeaderPanel/RoleLabel").visible, "Detail keeps the mission header free of profile copy")
+	_check(detail.get_node("CombatPanel/WeaponIconSlot") != null, "Equipment panel reserves a future icon slot")
 	_check(detail.get_node("HeaderPanel/PortraitContainer/HalfPortrait").texture == entry_001.get_node("PortraitTexture").texture, "Detail portrait matches selected card")
-	_check(detail.get_global_rect().size == Vector2(378, 500), "Detail uses the presentation card footprint")
+	_check(detail.get_global_rect().size == Vector2(390, 526), "Detail keeps a compact dossier footprint")
 	await _capture("camp-sur001-1600x900.png")
 	roster.select_survivor("SUR_002")
 	await create_timer(0.35).timeout
 	_check(detail.survivor_id == "SUR_002" and detail.get_node("HeaderPanel/SurvivorName").text == "苏晚星", "SUR_002 detail shows Su Wanxing")
+	_check(detail.get_node("HeaderPanel/TraitBadge/Label").text == "资源管理", "SUR_002 has a concise resource role tag")
 	_check(detail.get_node("HeaderPanel/PortraitContainer/HalfPortrait").texture == entry_002.get_node("PortraitTexture").texture, "SUR_002 detail uses the card portrait")
 	await _capture("camp-sur002-1600x900.png")
 

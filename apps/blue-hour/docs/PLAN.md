@@ -1393,6 +1393,14 @@ M03: TECHNICALLY COMPLETE；Town Structure: FROZEN。停止于人工视觉审核
 - [x] 附件《Camp Survivor Panel V2 目标效果图视觉重构》合并验收：Roster、Detail、动画与正式 `survivor_id` 数据链均已对照并通过 macOS 原生复核；见 [合并验收报告](reports/2026-09-23_camp_survivor_panel_visual_rework_report.md)。
 - [ ] `[Windows]` 待可访问 Windows 设备后执行正式 build 与独立程序启动验收。
 
+## 2026-09-23：Camp Survivor Panel V2.1 派遣整备
+
+- [x] M04 保持窄竖栏；强化已选成员蓝色识别与 1.03 轻微放大，未选成员降低亮度，悬停保持轻量反馈。
+- [x] M05 改为出发前整备：姓名、SUR ID、等级、HP 与简短任务定位在左，较小正式头像在右；装备/综合战力、四项既有属性、Trait 与底部操作保持紧凑可扫读。隐藏与整备决策无关且会挤占标题区的 Profile 摘要。
+- [x] 装备区域预留空白图标槽；升级按钮层级增强但沿用原有可用状态；不改头像资源、Survivor 数据与存档契约。
+- [x] Open 0.30 秒，Close 0.22 秒，Switch 0.06 秒退出 + 0.10 秒进入；隔离面板转场专项通过。
+- [ ] Main/Campaign 原生专项受当前工作区 `maps/exploration.gd` 解析错误阻断；隔离 Detail/Roster capture 已生成，不能代替完整 Camp 流程验收。详见 [V2.1 交付报告](reports/Camp_Survivor_Panel_V2_1_Report.md)。
+- [ ] Windows 完整 build 与独立程序启动需在修复现有地图脚本解析错误和 Camp 旧 HUD runtime 门禁后执行。
 ## 2026-09-22：蓝时归航 Expedition Map Phase 1 + Phase 2
 
 - [x] MiniMap 正式化：移除地图名、版本、Seed、Block ID 和 Debug Label 绘制路径；正式地图只保留地图几何、幸存者、POI、蓝时号和已发现地点标记。

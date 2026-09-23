@@ -30,23 +30,23 @@ func run() -> void:
 	await _capture("closed-1600x900.png")
 
 	entry_001.emit_signal("pressed")
-	_check(detail.visible and detail.modulate.a < 0.1 and detail.position.x > rest_x, "Open starts from a small rightward offset and zero alpha")
+	_check(detail.visible and detail.modulate.a < 0.1 and detail.position.x > rest_x and is_equal_approx(detail.scale.x, 0.96), "Open starts offset, transparent, and slightly reduced")
 	await create_timer(0.12).timeout
 	await process_frame
-	_check(detail.modulate.a > 0.0 and detail.modulate.a < 1.0, "Open passes through a soft intermediate opacity")
+	_check(detail.modulate.a > 0.0 and detail.modulate.a < 1.0 and detail.scale.x > 0.96 and detail.scale.x < 1.0, "Open eases opacity and scale together")
 	await _capture("opening-1600x900.png")
 	await create_timer(0.23).timeout
-	_check(detail.visible and is_equal_approx(detail.modulate.a, 1.0) and is_equal_approx(detail.position.x, rest_x), "Open settles at full opacity and layout position")
+	_check(detail.visible and is_equal_approx(detail.modulate.a, 1.0) and is_equal_approx(detail.position.x, rest_x) and is_equal_approx(detail.scale.x, 1.0), "Open settles at full opacity, scale, and layout position")
 	_check(detail.survivor_id == "SUR_001" and detail.get_node("HeaderPanel/SurvivorName").text == "夏知遥", "Open renders SUR_001")
 	_check(detail.get_node("HeaderPanel/PortraitContainer/HalfPortrait").texture == roster.get_survivor_view_data("SUR_001").get("portrait"), "Open portrait follows SUR_001 view")
 	await _capture("open-sur001-1600x900.png")
 
 	entry_002.emit_signal("pressed")
 	_check(detail.visible and is_equal_approx(detail.modulate.a, 1.0) and is_equal_approx(detail.position.x, rest_x), "Switch keeps the panel shell stable")
-	await create_timer(0.10).timeout
+	await create_timer(0.05).timeout
 	_check(is_equal_approx(detail.modulate.a, 1.0), "Switch fades content without fading the shell")
 	await _capture("switching-1600x900.png")
-	await create_timer(0.22).timeout
+	await create_timer(0.15).timeout
 	_check(detail.survivor_id == "SUR_002" and detail.get_node("HeaderPanel/SurvivorName").text == "苏晚星", "Switch renders SUR_002 without stale name")
 	_check(detail.get_node("HeaderPanel/PortraitContainer/HalfPortrait").texture == roster.get_survivor_view_data("SUR_002").get("portrait"), "Switch portrait follows SUR_002 view")
 	_check(is_equal_approx(detail.get_node("HeaderPanel").modulate.a, 1.0), "Switch content settles fully opaque")
@@ -58,7 +58,7 @@ func run() -> void:
 	await process_frame
 	_check(detail.visible and detail.modulate.a > 0.0 and detail.modulate.a < 1.0, "Close passes through a soft intermediate opacity")
 	await _capture("closing-1600x900.png")
-	await create_timer(0.18).timeout
+	await create_timer(0.22).timeout
 	_check(not detail.visible and is_zero_approx(detail.modulate.a) and is_equal_approx(detail.position.x, rest_x), "Close hides and resets the shell")
 	await _capture("closed-after-selection-1600x900.png")
 

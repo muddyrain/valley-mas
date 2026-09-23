@@ -2,15 +2,16 @@ extends Panel
 
 enum TransitionState { CLOSED, OPENING, OPEN, CLOSING, SWITCHING }
 
-const OPEN_DURATION := 0.26
-const CLOSE_DURATION := 0.20
-const SWITCH_OUT_DURATION := 0.08
-const SWITCH_IN_DURATION := 0.16
+const OPEN_DURATION := 0.30
+const CLOSE_DURATION := 0.22
+const SWITCH_OUT_DURATION := 0.06
+const SWITCH_IN_DURATION := 0.10
 
 var survivor_id: String = ""
 var transition_state: TransitionState = TransitionState.CLOSED
 var _transition: Tween
 var _rest_position: Vector2 = Vector2.ZERO
+var _rest_scale: Vector2 = Vector2.ONE
 var _slide_factor: float = 1.0
 var _pending_data: Dictionary = {}
 var _content: Array[Control] = []
@@ -29,9 +30,11 @@ func _ready() -> void:
 
 func set_layout_position(rest_position: Vector2, scale_factor: float) -> void:
 	_rest_position = rest_position
+	_rest_scale = Vector2.ONE * scale_factor
 	_slide_factor = scale_factor
 	if transition_state == TransitionState.CLOSED or transition_state == TransitionState.OPEN:
 		position = _rest_position
+		scale = _rest_scale
 		return
 	_cancel_transition()
 	if transition_state == TransitionState.CLOSING:
@@ -72,6 +75,7 @@ func close_panel() -> void:
 	_transition = create_tween()
 	_transition.tween_property(self, "modulate:a", 0.0, CLOSE_DURATION).set_delay(0.02).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
 	_transition.parallel().tween_property(self, "position:x", _rest_position.x + 18.0 * _slide_factor, CLOSE_DURATION).set_delay(0.02).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
+	_transition.parallel().tween_property(self, "scale", _rest_scale * 0.98, CLOSE_DURATION).set_delay(0.02).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
 	for control: Control in _content:
 		_transition.parallel().tween_property(control, "modulate:a", 0.0, 0.08)
 	_transition.tween_callback(_snap_closed)
@@ -89,6 +93,7 @@ func _start_open(data: Dictionary, from_closed: bool) -> void:
 	transition_state = TransitionState.OPENING
 	if from_closed:
 		position = _rest_position + Vector2(24.0 * _slide_factor, 0.0)
+		scale = _rest_scale * 0.96
 		modulate.a = 0.0
 		for control: Control in _content:
 			control.modulate.a = 0.0
@@ -98,6 +103,7 @@ func _start_open(data: Dictionary, from_closed: bool) -> void:
 	_transition = create_tween()
 	_transition.tween_property(self, "modulate:a", 1.0, OPEN_DURATION).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
 	_transition.parallel().tween_property(self, "position:x", _rest_position.x, OPEN_DURATION).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	_transition.parallel().tween_property(self, "scale", _rest_scale, OPEN_DURATION).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
 	for index: int in range(_content.size()):
 		_transition.parallel().tween_property(_content[index], "modulate:a", 1.0, 0.15).set_delay(0.03 + float(index) * 0.015).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
 	_transition.tween_callback(_finish_open)
@@ -156,6 +162,7 @@ func _finish_switch() -> void:
 func _snap_open() -> void:
 	visible = true
 	position = _rest_position
+	scale = _rest_scale
 	modulate.a = 1.0
 	_reset_content()
 	transition_state = TransitionState.OPEN
@@ -163,6 +170,7 @@ func _snap_open() -> void:
 func _snap_closed() -> void:
 	visible = false
 	position = _rest_position
+	scale = _rest_scale
 	modulate.a = 0.0
 	_reset_content()
 	survivor_id = ""
@@ -193,19 +201,9 @@ func show_survivor(data: Dictionary) -> void:
 	var role_tags := str(data.get("tags", "")).strip_edges()
 	var trait_name := str(data.get("trait", "")).strip_edges()
 	$HeaderPanel/TraitBadge.visible = not role_tags.is_empty()
-	$HeaderPanel/TraitBadge/Label.text = role_tags
-	var background_title := str(data.get("background_title", "")).strip_edges()
-	$HeaderPanel/RoleLabel.visible = not background_title.is_empty()
-	$HeaderPanel/RoleLabel.text = background_title
-	var quote := str(data.get("quote", "")).strip_edges()
-	if quote.is_empty():
-		quote = str(data.get("background_description", "")).strip_edges()
-	if quote.contains("。"):
-		quote = quote.get_slice("。", 0) + "。"
-	if quote.length() > 37:
-		quote = quote.left(36) + "…"
-	$BackgroundPanel.visible = not quote.is_empty()
-	$BackgroundPanel/BackgroundDescription.text = quote
+	$HeaderPanel/TraitBadge/Label.text = _mission_role_label(role_tags)
+	$HeaderPanel/RoleLabel.visible = false
+	$BackgroundPanel.visible = false
 	$HeaderPanel/PortraitContainer/HalfPortrait.texture = data.get("portrait") as Texture2D
 	$CombatPanel/WeaponName.text = str(data.get("weapon", ""))
 	$CombatPanel/WeaponType.text = str(data.get("weapon_type", ""))
@@ -224,3 +222,12 @@ func show_survivor(data: Dictionary) -> void:
 	$ActionBar/SwitchButton.disabled = str(action_states.get("switch", "disabled")) != "available"
 	$ActionBar/EquipmentButton.disabled = str(action_states.get("equipment", "disabled")) != "available"
 	$ActionBar/UpgradeButton.disabled = str(action_states.get("upgrade", "locked")) != "available"
+
+func _mission_role_label(role_tags: String) -> String:
+	if role_tags.contains("搜索") or role_tags.contains("勘查"):
+		return "探索专家"
+	if role_tags.contains("资源") or role_tags.contains("搜刮"):
+		return "资源管理"
+	if role_tags.is_empty():
+		return ""
+	return role_tags.get_slice(" · ", 0)

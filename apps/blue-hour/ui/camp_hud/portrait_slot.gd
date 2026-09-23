@@ -66,12 +66,13 @@ func _update_visual(immediate: bool = false) -> void:
 	var name_label: Label = $NameLabel
 	var english_label: Label = $EnglishLabel
 	var meta_label: Label = $MetaLabel
+	pivot_offset = Vector2(size.x * 0.5, size.y if _hovered and not selected else size.y * 0.5)
 	frame.texture = SELECTED_FRAME if selected else NORMAL_FRAME
 	var tint: Color = Color.WHITE if selected else (HOVER_TINT if _hovered else NORMAL_TINT)
 	var portrait_tint := Color.WHITE if selected else (Color(0.94, 0.97, 1.0, 1.0) if _hovered else Color(0.72, 0.78, 0.84, 1.0))
 	var info_tint := Color(1.10, 1.14, 1.16, 1) if selected else (Color(1.05, 1.08, 1.10, 1) if _hovered else Color(0.94, 0.97, 0.98, 1))
 	var name_tint := Color(1.10, 1.16, 1.18, 1) if selected else Color.WHITE
-	var target_scale := Vector2.ONE * (0.98 if _held else (1.02 if _hovered and not selected else 1.0))
+	var target_scale := Vector2.ONE * (0.98 if _held else (1.03 if selected else (1.02 if _hovered else 1.0)))
 	if immediate:
 		frame.self_modulate = tint
 		portrait.self_modulate = portrait_tint
