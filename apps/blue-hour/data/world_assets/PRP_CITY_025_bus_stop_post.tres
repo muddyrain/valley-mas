@@ -1,0 +1,21 @@
+[gd_resource type="Resource" format=3]
+
+[ext_resource type="PackedScene" path="res://assets/world/props/city_props_v2/PRP_CITY_025_bus_stop_post.glb" id="1_d5tmv"]
+[ext_resource type="Script" path="res://data/world_asset_data.gd" id="2_3w7id"]
+
+[resource]
+script = ExtResource("2_3w7id")
+id = "PRP_CITY_025_bus_stop_post"
+scene = ExtResource("1_d5tmv")
+category = "road"
+footprint = Vector2(0.48, 0.36)
+bounding_size = Vector3(0.48, 2.35, 0.36)
+spawn_weight = 0.0
+allowed_district = PackedStringArray()
+loot_profile = ""
+enemy_profile = ""
+searchable = false
+loot_tags = PackedStringArray()
+mission_tags = PackedStringArray()
+interaction_tags = PackedStringArray()
+environment_tags = PackedStringArray("ROAD", "COMMERCIAL")

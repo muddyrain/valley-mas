@@ -1,0 +1,21 @@
+[gd_resource type="Resource" format=3]
+
+[ext_resource type="PackedScene" path="res://assets/world/props/city_props_v2/PRP_CITY_021_street_bollard_set.glb" id="1_fkeoc"]
+[ext_resource type="Script" path="res://data/world_asset_data.gd" id="2_xwdh1"]
+
+[resource]
+script = ExtResource("2_xwdh1")
+id = "PRP_CITY_021_street_bollard_set"
+scene = ExtResource("1_fkeoc")
+category = "road"
+footprint = Vector2(1.12, 0.42)
+bounding_size = Vector3(1.12, 0.82, 0.42)
+spawn_weight = 0.0
+allowed_district = PackedStringArray()
+loot_profile = ""
+enemy_profile = ""
+searchable = false
+loot_tags = PackedStringArray()
+mission_tags = PackedStringArray()
+interaction_tags = PackedStringArray()
+environment_tags = PackedStringArray("ROAD", "ROAD_EDGE")

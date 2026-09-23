@@ -1,0 +1,147 @@
+{
+  "version": 1,
+  "phase": "3B",
+  "generator": "Blender 5.2 Python",
+  "assets": [
+    {
+      "asset_name": "PRP_CITY_001_shop_sign",
+      "file_path": "assets/world/props/city_props_v1/PRP_CITY_001_shop_sign.glb",
+      "source_path": "art/blender/sources/PRP_CITY_001_shop_sign.blend",
+      "tris": 660,
+      "size": [2, 0.97686, 0.38774],
+      "category": "commercial",
+      "materials": [
+        "BH_Emergency_Red",
+        "BH_Metal_Dark",
+        "BH_Metal_Mid",
+        "BH_Muted_Green",
+        "BH_Plastic_Light",
+        "BH_Safety_Yellow",
+        "BH_Warm_Orange"
+      ]
+    },
+    {
+      "asset_name": "PRP_CITY_002_ac_unit",
+      "file_path": "assets/world/props/city_props_v1/PRP_CITY_002_ac_unit.glb",
+      "source_path": "art/blender/sources/PRP_CITY_002_ac_unit.blend",
+      "tris": 756,
+      "size": [1.08544, 0.75245, 0.5425],
+      "category": "residential",
+      "materials": ["BH_Metal_Dark", "BH_Metal_Mid", "BH_Plastic_Light", "BH_Safety_Yellow"]
+    },
+    {
+      "asset_name": "PRP_CITY_003_power_pole",
+      "file_path": "assets/world/props/city_props_v1/PRP_CITY_003_power_pole.glb",
+      "source_path": "art/blender/sources/PRP_CITY_003_power_pole.blend",
+      "tris": 848,
+      "size": [0.73388, 6.105, 0.39774],
+      "category": "road",
+      "materials": [
+        "BH_Concrete_Dark",
+        "BH_Concrete_Light",
+        "BH_Metal_Mid",
+        "BH_Muted_Green",
+        "BH_Plastic_Light",
+        "BH_Safety_Yellow"
+      ]
+    },
+    {
+      "asset_name": "PRP_CITY_004_power_wire_set",
+      "file_path": "assets/world/props/city_props_v1/PRP_CITY_004_power_wire_set.glb",
+      "source_path": "art/blender/sources/PRP_CITY_004_power_wire_set.blend",
+      "tris": 768,
+      "size": [9.00476, 0.63584, 0.146],
+      "category": "road",
+      "materials": ["BH_Metal_Dark"]
+    },
+    {
+      "asset_name": "PRP_CITY_005_traffic_light",
+      "file_path": "assets/world/props/city_props_v1/PRP_CITY_005_traffic_light.glb",
+      "source_path": "art/blender/sources/PRP_CITY_005_traffic_light.blend",
+      "tris": 776,
+      "size": [0.46, 3.89419, 0.78543],
+      "category": "road",
+      "materials": [
+        "BH_Concrete_Dark",
+        "BH_Emergency_Red",
+        "BH_Metal_Dark",
+        "BH_Metal_Mid",
+        "BH_Muted_Green",
+        "BH_Safety_Yellow"
+      ]
+    },
+    {
+      "asset_name": "PRP_CITY_006_bus_shelter",
+      "file_path": "assets/world/props/city_props_v1/PRP_CITY_006_bus_shelter.glb",
+      "source_path": "art/blender/sources/PRP_CITY_006_bus_shelter.blend",
+      "tris": 836,
+      "size": [4.85, 2.705, 1.82],
+      "category": "commercial",
+      "materials": [
+        "BH_Glass",
+        "BH_Metal_Dark",
+        "BH_Metal_Mid",
+        "BH_Muted_Green",
+        "BH_Plastic_Light",
+        "BH_Safety_Yellow",
+        "BH_Warm_Orange"
+      ]
+    },
+    {
+      "asset_name": "PRP_CITY_007_awning",
+      "file_path": "assets/world/props/city_props_v1/PRP_CITY_007_awning.glb",
+      "source_path": "art/blender/sources/PRP_CITY_007_awning.blend",
+      "tris": 596,
+      "size": [3.4, 0.658, 1.265],
+      "category": "commercial",
+      "materials": [
+        "BH_Metal_Dark",
+        "BH_Metal_Mid",
+        "BH_Muted_Green",
+        "BH_Plastic_Light",
+        "BH_Warm_Orange"
+      ]
+    },
+    {
+      "asset_name": "PRP_CITY_008_cardboard_stack",
+      "file_path": "assets/world/props/city_props_v1/PRP_CITY_008_cardboard_stack.glb",
+      "source_path": "art/blender/sources/PRP_CITY_008_cardboard_stack.blend",
+      "tris": 396,
+      "size": [1.31172, 1.1375, 0.675],
+      "category": "industrial",
+      "materials": ["BH_Concrete_Light", "BH_Plastic_Light", "BH_Safety_Yellow", "BH_Warm_Orange"]
+    },
+    {
+      "asset_name": "PRP_CITY_009_fire_hydrant",
+      "file_path": "assets/world/props/city_props_v1/PRP_CITY_009_fire_hydrant.glb",
+      "source_path": "art/blender/sources/PRP_CITY_009_fire_hydrant.blend",
+      "tris": 904,
+      "size": [0.6, 1.025, 0.54],
+      "category": "road",
+      "materials": [
+        "BH_Emergency_Red",
+        "BH_Metal_Dark",
+        "BH_Metal_Mid",
+        "BH_Plastic_Light",
+        "BH_Safety_Yellow"
+      ]
+    },
+    {
+      "asset_name": "PRP_CITY_010_broken_billboard",
+      "file_path": "assets/world/props/city_props_v1/PRP_CITY_010_broken_billboard.glb",
+      "source_path": "art/blender/sources/PRP_CITY_010_broken_billboard.blend",
+      "tris": 636,
+      "size": [3.4, 3.475, 1.91],
+      "category": "industrial",
+      "materials": [
+        "BH_Concrete_Dark",
+        "BH_Metal_Dark",
+        "BH_Metal_Mid",
+        "BH_Muted_Green",
+        "BH_Plastic_Light",
+        "BH_Safety_Yellow",
+        "BH_Warm_Orange"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,21 @@
+[gd_resource type="Resource" format=3]
+
+[ext_resource type="PackedScene" path="res://assets/world/props/city_props_v2/PRP_CITY_027_cloth_tarp_bundle.glb" id="1_04jf7"]
+[ext_resource type="Script" path="res://data/world_asset_data.gd" id="2_vktau"]
+
+[resource]
+script = ExtResource("2_vktau")
+id = "PRP_CITY_027_cloth_tarp_bundle"
+scene = ExtResource("1_04jf7")
+category = "aftermath"
+footprint = Vector2(1.34, 0.46)
+bounding_size = Vector3(1.34, 0.98, 0.46)
+spawn_weight = 0.0
+allowed_district = PackedStringArray()
+loot_profile = ""
+enemy_profile = ""
+searchable = false
+loot_tags = PackedStringArray()
+mission_tags = PackedStringArray()
+interaction_tags = PackedStringArray()
+environment_tags = PackedStringArray("AFTERMATH", "INDUSTRIAL")

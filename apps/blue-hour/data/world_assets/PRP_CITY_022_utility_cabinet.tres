@@ -1,0 +1,21 @@
+[gd_resource type="Resource" format=3]
+
+[ext_resource type="PackedScene" path="res://assets/world/props/city_props_v2/PRP_CITY_022_utility_cabinet.glb" id="1_my26c"]
+[ext_resource type="Script" path="res://data/world_asset_data.gd" id="2_eno1k"]
+
+[resource]
+script = ExtResource("2_eno1k")
+id = "PRP_CITY_022_utility_cabinet"
+scene = ExtResource("1_my26c")
+category = "road"
+footprint = Vector2(0.76, 0.62)
+bounding_size = Vector3(0.76, 1.15, 0.62)
+spawn_weight = 0.0
+allowed_district = PackedStringArray()
+loot_profile = ""
+enemy_profile = ""
+searchable = false
+loot_tags = PackedStringArray()
+mission_tags = PackedStringArray()
+interaction_tags = PackedStringArray()
+environment_tags = PackedStringArray("ROAD", "ROAD_EDGE")

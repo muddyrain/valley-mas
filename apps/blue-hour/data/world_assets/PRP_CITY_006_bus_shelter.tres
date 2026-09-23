@@ -1,0 +1,21 @@
+[gd_resource type="Resource" format=3]
+
+[ext_resource type="PackedScene" path="res://assets/world/props/city_props_v1/PRP_CITY_006_bus_shelter.glb" id="1_t5kl7"]
+[ext_resource type="Script" path="res://data/world_asset_data.gd" id="2_xuabs"]
+
+[resource]
+script = ExtResource("2_xuabs")
+id = "PRP_CITY_006_bus_shelter"
+scene = ExtResource("1_t5kl7")
+category = "commercial"
+footprint = Vector2(4.8, 1.85)
+bounding_size = Vector3(4.8, 2.75, 1.85)
+spawn_weight = 0.0
+allowed_district = PackedStringArray()
+loot_profile = ""
+enemy_profile = ""
+searchable = false
+loot_tags = PackedStringArray()
+mission_tags = PackedStringArray()
+interaction_tags = PackedStringArray()
+environment_tags = PackedStringArray("COMMERCIAL", "ROAD_EDGE")

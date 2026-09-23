@@ -1,0 +1,21 @@
+[gd_resource type="Resource" format=3]
+
+[ext_resource type="PackedScene" path="res://assets/world/props/city_props_v2/PRP_CITY_020_storefront_flag_pair.glb" id="1_cb4wa"]
+[ext_resource type="Script" path="res://data/world_asset_data.gd" id="2_jw1ky"]
+
+[resource]
+script = ExtResource("2_jw1ky")
+id = "PRP_CITY_020_storefront_flag_pair"
+scene = ExtResource("1_cb4wa")
+category = "commercial"
+footprint = Vector2(1.12, 0.28)
+bounding_size = Vector3(1.12, 1.46, 0.28)
+spawn_weight = 0.0
+allowed_district = PackedStringArray()
+loot_profile = ""
+enemy_profile = ""
+searchable = false
+loot_tags = PackedStringArray()
+mission_tags = PackedStringArray()
+interaction_tags = PackedStringArray()
+environment_tags = PackedStringArray("COMMERCIAL", "FRONTAGE")

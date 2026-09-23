@@ -1,0 +1,21 @@
+[gd_resource type="Resource" format=3]
+
+[ext_resource type="PackedScene" path="res://assets/world/props/city_props_v2/PRP_CITY_019_sidewalk_banner_stand.glb" id="1_7jlqb"]
+[ext_resource type="Script" path="res://data/world_asset_data.gd" id="2_fygnr"]
+
+[resource]
+script = ExtResource("2_fygnr")
+id = "PRP_CITY_019_sidewalk_banner_stand"
+scene = ExtResource("1_7jlqb")
+category = "commercial"
+footprint = Vector2(0.92, 0.44)
+bounding_size = Vector3(0.92, 2.05, 0.44)
+spawn_weight = 0.0
+allowed_district = PackedStringArray()
+loot_profile = ""
+enemy_profile = ""
+searchable = false
+loot_tags = PackedStringArray()
+mission_tags = PackedStringArray()
+interaction_tags = PackedStringArray()
+environment_tags = PackedStringArray("COMMERCIAL", "FRONTAGE")

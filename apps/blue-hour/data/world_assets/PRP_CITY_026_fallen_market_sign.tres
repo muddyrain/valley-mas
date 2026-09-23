@@ -1,0 +1,21 @@
+[gd_resource type="Resource" format=3]
+
+[ext_resource type="PackedScene" path="res://assets/world/props/city_props_v2/PRP_CITY_026_fallen_market_sign.glb" id="1_gl1un"]
+[ext_resource type="Script" path="res://data/world_asset_data.gd" id="2_n4615"]
+
+[resource]
+script = ExtResource("2_n4615")
+id = "PRP_CITY_026_fallen_market_sign"
+scene = ExtResource("1_gl1un")
+category = "aftermath"
+footprint = Vector2(1.42, 0.2)
+bounding_size = Vector3(1.42, 0.92, 0.2)
+spawn_weight = 0.0
+allowed_district = PackedStringArray()
+loot_profile = ""
+enemy_profile = ""
+searchable = false
+loot_tags = PackedStringArray()
+mission_tags = PackedStringArray()
+interaction_tags = PackedStringArray()
+environment_tags = PackedStringArray("AFTERMATH", "COMMERCIAL")

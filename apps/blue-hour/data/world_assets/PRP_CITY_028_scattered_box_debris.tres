@@ -1,0 +1,21 @@
+[gd_resource type="Resource" format=3]
+
+[ext_resource type="PackedScene" path="res://assets/world/props/city_props_v2/PRP_CITY_028_scattered_box_debris.glb" id="1_jopqq"]
+[ext_resource type="Script" path="res://data/world_asset_data.gd" id="2_ug4fw"]
+
+[resource]
+script = ExtResource("2_ug4fw")
+id = "PRP_CITY_028_scattered_box_debris"
+scene = ExtResource("1_jopqq")
+category = "aftermath"
+footprint = Vector2(1.46, 0.34)
+bounding_size = Vector3(1.46, 1.02, 0.34)
+spawn_weight = 0.0
+allowed_district = PackedStringArray()
+loot_profile = ""
+enemy_profile = ""
+searchable = false
+loot_tags = PackedStringArray()
+mission_tags = PackedStringArray()
+interaction_tags = PackedStringArray()
+environment_tags = PackedStringArray("AFTERMATH", "INDUSTRIAL")

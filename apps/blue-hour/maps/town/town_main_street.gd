@@ -1,6 +1,10 @@
 extends RefCounted
 ## Road-relative composition: branch chains own junctions; land follows their exposed edges.
 
+const RESIDENTIAL_FRONTAGE_GAP := 1.4
+const COMMERCIAL_FRONTAGE_GAP := 1.1
+const INDUSTRIAL_FRONTAGE_GAP := 4.0
+
 static func generate(rng: RandomNumberGenerator) -> Dictionary:
 	var sw := -68.0 + rng.randf_range(-3, 3)
 	var nw := -42.0 + rng.randf_range(-2, 2)
@@ -31,7 +35,7 @@ static func generate(rng: RandomNumberGenerator) -> Dictionary:
 	var corner := _block("COMMERCIAL_CORNER_A", "CORNER", PackedVector2Array([
 		Vector2(nw + 4, neck + 4), Vector2(nw + 17, neck + 4), Vector2(nw + 17, -19),
 		Vector2(ne - 4, -19), Vector2(ne - 4, -6), Vector2(nw + 4, -6)]), roads)
-	corner.rows = [{"side": "south", "category": "commercial", "count": 7, "gap": 1.8}, {"side": "west", "category": "commercial", "count": 2, "gap": 1.8, "trim_end": 17.0}]
+	corner.rows = [{"side": "south", "category": "commercial", "count": 7, "gap": COMMERCIAL_FRONTAGE_GAP}, {"side": "west", "category": "commercial", "count": 2, "gap": COMMERCIAL_FRONTAGE_GAP, "trim_end": 17.0}]
 	blocks.append(corner)
 	blocks.append(_lot(roads[4], north + 10, -34, "west", 29, "RECTANGLE", "RESIDENTIAL_BLOCK_A", "residential", 4))
 	blocks.append(_lot(roads[11], nw + 12, ne - 10, "south", 25, "IRREGULAR", "RESIDENTIAL_BLOCK_A", "residential", 4))
@@ -41,12 +45,12 @@ static func generate(rng: RandomNumberGenerator) -> Dictionary:
 	var mixed := _block("MIXED_BLOCK_A", "L_SHAPE", PackedVector2Array([
 		Vector2(se - 26, 12), Vector2(se - 4, 12), Vector2(se - 4, east_bend - 4),
 		Vector2(east_stem + 3, east_bend - 4), Vector2(east_stem + 3, east_bend - 26), Vector2(se - 26, east_bend - 26)]), roads)
-	mixed.rows = [{"side": "east", "category": "commercial", "count": 2, "gap": 2.0, "trim_end": east_bend - 44.0}, {"side": "south", "category": "residential", "count": 2, "gap": 3.0}]
+	mixed.rows = [{"side": "east", "category": "commercial", "count": 2, "gap": COMMERCIAL_FRONTAGE_GAP, "trim_end": east_bend - 44.0}, {"side": "south", "category": "residential", "count": 3, "gap": RESIDENTIAL_FRONTAGE_GAP}]
 	blocks.append(mixed)
 	blocks.append(_lot(roads[8], 12, east_bend - 6, "east", 36, "IRREGULAR", "INDUSTRIAL_BLOCK_A", "industrial", 2))
 	blocks.append(_lot(roads[10], east_bend + 8, east_tip - 4, "east", 38, "SERVICE_YARD", "INDUSTRIAL_BLOCK_A", "industrial", 2))
 	blocks.append(_lot(roads[10], east_bend + 26, east_tip - 2, "west", 25, "SERVICE_YARD", "PARKING_SERVICE_BLOCK", "special", 1))
-	blocks.append(_lot(roads[1], 34, west_bend - 6, "east", 25, "RECTANGLE", "RESIDENTIAL_BLOCK_B", "residential", 2))
+	blocks.append(_lot(roads[1], 22, west_bend - 6, "east", 25, "RECTANGLE", "RESIDENTIAL_BLOCK_B", "residential", 3))
 	blocks.append(_lot(roads[3], west_bend + 6, west_tip - 2, "west", 28, "RECTANGLE", "RESIDENTIAL_BLOCK_B", "residential", 3))
 	var park := _block("COMMUNITY_PARK", "COURTYARD", PackedVector2Array([
 		Vector2(nw + 18, neck + 4), Vector2(ne - 4, neck + 4), Vector2(ne - 4, -20), Vector2(nw + 18, -20)]), roads)
@@ -120,7 +124,8 @@ static func _lot(road: Dictionary, begin: float, end: float, side: String, depth
 	for point: Vector2 in points:
 		polygon.append(origin + tangent * point.x - outward * point.y)
 	var block := _block(kind, shape, polygon, [road])
-	block.rows = [{"side": "south" if side == "north" else "north" if side == "south" else "west" if side == "east" else "east", "category": category, "count": count, "gap": 8.0 if category == "industrial" else 2.8 if category == "residential" else 1.8}]
+	var frontage_gap: float = INDUSTRIAL_FRONTAGE_GAP if category == "industrial" else RESIDENTIAL_FRONTAGE_GAP if category == "residential" else COMMERCIAL_FRONTAGE_GAP
+	block.rows = [{"side": "south" if side == "north" else "north" if side == "south" else "west" if side == "east" else "east", "category": category, "count": count, "gap": frontage_gap}]
 	return block
 
 static func _block(kind: String, shape: String, polygon: PackedVector2Array, roads: Array[Dictionary]) -> Dictionary:

@@ -129,7 +129,59 @@ SUR_001～SUR_012 均使用 1.65m Runtime Envelope、冻结的 23 骨 `BH_Humano
 | BH_Window_Small<br>小窗 | modules | [GLB](../assets/generated/environment_window_small_model.glb) / [blend](blender/sources/BH_Window_Small.blend) | 320 | BH_Concrete_Light, BH_Emission_Warm, BH_Glass, BH_Metal_Mid | 1 Box→Convex | Art Showcase；资产库待复用 | 是 / 否 | Blender Generated |
 | BH_WoodCrate<br>木箱 | props | [GLB](../assets/generated/environment_wood_crate_model.glb) / [blend](blender/sources/BH_WoodCrate.blend) | 476 | BH_Concrete_Dark, BH_Plastic_Light, BH_Warm_Orange | 1 Box→Convex | Art Showcase；仓库装卸口装饰 | 是 / 否 | Blender Generated |
 
-合计：52 个模型，80756 个渲染三角形。几何预算为上限，简单模块不会为填满预算而增加面数。
+合计：86 个模型，98,272 个渲染三角形。几何预算为上限，简单模块不会为填满预算而增加面数。
+
+## Expedition City Props V1（2026-09-23）
+
+Phase 3B 使用本机 Blender 5.2.1 LTS 真实生成，每项有独立 GLB 与可编辑 `.blend` 源。资产统一使用 `ART_BIBLE` 共享低饱和色板、简化轮廓和克制细节；没有照片贴图。道具不带碰撞、搜索或玩法权重，由 Urban Dressing 宿主负责摆放。实际几何与尺寸来自导出 GLB 统计，尺寸按宽 × 高 × 深（米）。
+
+| Runtime Asset ID | GLB | Blender 源 | tris | 尺寸 | 使用区域 |
+|---|---|---|---:|---|---|
+| PRP_CITY_001_shop_sign | [GLB](../assets/world/props/city_props_v1/PRP_CITY_001_shop_sign.glb) | [blend](blender/sources/PRP_CITY_001_shop_sign.blend) | 660 | 2.00 × 0.98 × 0.39 | 商业 |
+| PRP_CITY_002_ac_unit | [GLB](../assets/world/props/city_props_v1/PRP_CITY_002_ac_unit.glb) | [blend](blender/sources/PRP_CITY_002_ac_unit.blend) | 756 | 1.09 × 0.75 × 0.54 | 住宅/商业立面 |
+| PRP_CITY_003_power_pole | [GLB](../assets/world/props/city_props_v1/PRP_CITY_003_power_pole.glb) | [blend](blender/sources/PRP_CITY_003_power_pole.blend) | 848 | 0.73 × 6.11 × 0.40 | 道路 |
+| PRP_CITY_004_power_wire_set | [GLB](../assets/world/props/city_props_v1/PRP_CITY_004_power_wire_set.glb) | [blend](blender/sources/PRP_CITY_004_power_wire_set.blend) | 768 | 9.00 × 0.64 × 0.15 | 道路上方 |
+| PRP_CITY_005_traffic_light | [GLB](../assets/world/props/city_props_v1/PRP_CITY_005_traffic_light.glb) | [blend](blender/sources/PRP_CITY_005_traffic_light.blend) | 776 | 0.46 × 3.89 × 0.79 | 道路路口 |
+| PRP_CITY_006_bus_shelter | [GLB](../assets/world/props/city_props_v1/PRP_CITY_006_bus_shelter.glb) | [blend](blender/sources/PRP_CITY_006_bus_shelter.blend) | 836 | 4.85 × 2.71 × 1.82 | 商业街/路边 |
+| PRP_CITY_007_awning | [GLB](../assets/world/props/city_props_v1/PRP_CITY_007_awning.glb) | [blend](blender/sources/PRP_CITY_007_awning.blend) | 596 | 3.40 × 0.66 × 1.27 | 商业立面 |
+| PRP_CITY_008_cardboard_stack | [GLB](../assets/world/props/city_props_v1/PRP_CITY_008_cardboard_stack.glb) | [blend](blender/sources/PRP_CITY_008_cardboard_stack.blend) | 396 | 1.31 × 1.14 × 0.68 | 工业街面 |
+| PRP_CITY_009_fire_hydrant | [GLB](../assets/world/props/city_props_v1/PRP_CITY_009_fire_hydrant.glb) | [blend](blender/sources/PRP_CITY_009_fire_hydrant.blend) | 904 | 0.60 × 1.03 × 0.54 | 道路边缘 |
+| PRP_CITY_010_broken_billboard | [GLB](../assets/world/props/city_props_v1/PRP_CITY_010_broken_billboard.glb) | [blend](blender/sources/PRP_CITY_010_broken_billboard.blend) | 636 | 3.40 × 3.48 × 1.91 | 工业区/路边 |
+
+完整机器清单见 [city_props_v1 manifest](../assets/world/props/city_props_v1/manifest.json)。
+
+## Expedition City Props V2（2026-09-23，Phase 3C）
+
+Blender 5.2.1 LTS 新增 24 个独立低模，每件有可编辑 `.blend` 源和正式 GLB。共享 ART_BIBLE V1 大色块材质，无贴图、碰撞代理、Search 或玩法权重。单件 124–916 tris，合计 10,340 tris；尺寸为导出 GLB 实测宽 × 高 × 深（米）。
+
+| Runtime Asset ID | GLB | Blender 源 | tris | 尺寸 | 区域 |
+|---|---|---|---:|---|---|
+| PRP_CITY_011_planter_box_pair | [GLB](../assets/world/props/city_props_v2/PRP_CITY_011_planter_box_pair.glb) | [blend](blender/sources/PRP_CITY_011_planter_box_pair.blend) | 424 | 1.52 × 0.89 × 0.50 | 住宅/庭院 |
+| PRP_CITY_012_neighborhood_notice_board | [GLB](../assets/world/props/city_props_v2/PRP_CITY_012_neighborhood_notice_board.glb) | [blend](blender/sources/PRP_CITY_012_neighborhood_notice_board.blend) | 352 | 1.22 × 1.68 × 0.24 | 住宅 |
+| PRP_CITY_013_recycling_bin_pair | [GLB](../assets/world/props/city_props_v2/PRP_CITY_013_recycling_bin_pair.glb) | [blend](blender/sources/PRP_CITY_013_recycling_bin_pair.blend) | 264 | 1.04 × 0.84 × 0.60 | 住宅/商业 |
+| PRP_CITY_014_delivery_lockbox | [GLB](../assets/world/props/city_props_v2/PRP_CITY_014_delivery_lockbox.glb) | [blend](blender/sources/PRP_CITY_014_delivery_lockbox.blend) | 292 | 0.67 × 0.82 × 0.58 | 住宅 |
+| PRP_CITY_015_garden_tool_cart | [GLB](../assets/world/props/city_props_v2/PRP_CITY_015_garden_tool_cart.glb) | [blend](blender/sources/PRP_CITY_015_garden_tool_cart.blend) | 592 | 1.04 × 0.86 × 0.70 | 住宅/庭院 |
+| PRP_CITY_016_storefront_menu_stand | [GLB](../assets/world/props/city_props_v2/PRP_CITY_016_storefront_menu_stand.glb) | [blend](blender/sources/PRP_CITY_016_storefront_menu_stand.blend) | 448 | 0.58 × 1.02 × 0.32 | 商业店前 |
+| PRP_CITY_017_beverage_crate_stack | [GLB](../assets/world/props/city_props_v2/PRP_CITY_017_beverage_crate_stack.glb) | [blend](blender/sources/PRP_CITY_017_beverage_crate_stack.blend) | 528 | 1.04 × 0.84 × 0.53 | 商业店前 |
+| PRP_CITY_018_delivery_handcart | [GLB](../assets/world/props/city_props_v2/PRP_CITY_018_delivery_handcart.glb) | [blend](blender/sources/PRP_CITY_018_delivery_handcart.blend) | 548 | 0.86 × 0.97 × 0.78 | 商业/工业 |
+| PRP_CITY_019_sidewalk_banner_stand | [GLB](../assets/world/props/city_props_v2/PRP_CITY_019_sidewalk_banner_stand.glb) | [blend](blender/sources/PRP_CITY_019_sidewalk_banner_stand.blend) | 356 | 0.86 × 1.78 × 0.50 | 商业店前 |
+| PRP_CITY_020_storefront_flag_pair | [GLB](../assets/world/props/city_props_v2/PRP_CITY_020_storefront_flag_pair.glb) | [blend](blender/sources/PRP_CITY_020_storefront_flag_pair.blend) | 404 | 1.10 × 1.16 × 0.20 | 商业立面 |
+| PRP_CITY_021_street_bollard_set | [GLB](../assets/world/props/city_props_v2/PRP_CITY_021_street_bollard_set.glb) | [blend](blender/sources/PRP_CITY_021_street_bollard_set.blend) | 828 | 1.08 × 0.71 × 0.34 | 道路边缘 |
+| PRP_CITY_022_utility_cabinet | [GLB](../assets/world/props/city_props_v2/PRP_CITY_022_utility_cabinet.glb) | [blend](blender/sources/PRP_CITY_022_utility_cabinet.blend) | 308 | 0.68 × 1.03 × 0.58 | 道路边缘 |
+| PRP_CITY_023_guardrail_segment | [GLB](../assets/world/props/city_props_v2/PRP_CITY_023_guardrail_segment.glb) | [blend](blender/sources/PRP_CITY_023_guardrail_segment.blend) | 264 | 2.35 × 0.80 × 0.22 | 道路边缘 |
+| PRP_CITY_024_bicycle_parking_rack | [GLB](../assets/world/props/city_props_v2/PRP_CITY_024_bicycle_parking_rack.glb) | [blend](blender/sources/PRP_CITY_024_bicycle_parking_rack.blend) | 916 | 1.48 × 0.61 × 0.30 | 道路/住宅 |
+| PRP_CITY_025_bus_stop_post | [GLB](../assets/world/props/city_props_v2/PRP_CITY_025_bus_stop_post.glb) | [blend](blender/sources/PRP_CITY_025_bus_stop_post.blend) | 220 | 0.44 × 2.08 × 0.30 | 道路/Arrival |
+| PRP_CITY_026_fallen_market_sign | [GLB](../assets/world/props/city_props_v2/PRP_CITY_026_fallen_market_sign.glb) | [blend](blender/sources/PRP_CITY_026_fallen_market_sign.blend) | 316 | 1.25 × 0.82 × 0.66 | 轻灾后/商业 |
+| PRP_CITY_027_cloth_tarp_bundle | [GLB](../assets/world/props/city_props_v2/PRP_CITY_027_cloth_tarp_bundle.glb) | [blend](blender/sources/PRP_CITY_027_cloth_tarp_bundle.blend) | 264 | 1.18 × 0.48 × 0.92 | 轻灾后/工业 |
+| PRP_CITY_028_scattered_box_debris | [GLB](../assets/world/props/city_props_v2/PRP_CITY_028_scattered_box_debris.glb) | [blend](blender/sources/PRP_CITY_028_scattered_box_debris.blend) | 308 | 1.04 × 0.28 × 0.68 | 轻灾后/工业 |
+| PRP_CITY_029_broken_fence_section | [GLB](../assets/world/props/city_props_v2/PRP_CITY_029_broken_fence_section.glb) | [blend](blender/sources/PRP_CITY_029_broken_fence_section.blend) | 352 | 1.95 × 1.02 × 0.20 | 轻灾后/住宅 |
+| PRP_CITY_030_roadside_grass_patch | [GLB](../assets/world/props/city_props_v2/PRP_CITY_030_roadside_grass_patch.glb) | [blend](blender/sources/PRP_CITY_030_roadside_grass_patch.blend) | 504 | 1.34 × 0.37 × 0.94 | 植被/道路边缘 |
+| PRP_CITY_031_small_bush_cluster | [GLB](../assets/world/props/city_props_v2/PRP_CITY_031_small_bush_cluster.glb) | [blend](blender/sources/PRP_CITY_031_small_bush_cluster.blend) | 124 | 1.43 × 0.94 × 0.91 | 植被/住宅 |
+| PRP_CITY_032_neglected_planter | [GLB](../assets/world/props/city_props_v2/PRP_CITY_032_neglected_planter.glb) | [blend](blender/sources/PRP_CITY_032_neglected_planter.blend) | 536 | 1.07 × 0.87 × 0.71 | 植被/住宅 |
+| PRP_CITY_033_small_vine_patch | [GLB](../assets/world/props/city_props_v2/PRP_CITY_033_small_vine_patch.glb) | [blend](blender/sources/PRP_CITY_033_small_vine_patch.blend) | 604 | 1.00 × 0.98 × 0.17 | 植被/立面 |
+| PRP_CITY_034_umbrella_stand | [GLB](../assets/world/props/city_props_v2/PRP_CITY_034_umbrella_stand.glb) | [blend](blender/sources/PRP_CITY_034_umbrella_stand.blend) | 588 | 0.62 × 1.46 × 0.62 | 住宅/商业 |
+
+完整来源、SHA-256、尺寸和材质清单见 [Phase 3C manifest](../assets/world/props/city_props_v2/manifest.json)。
 
 ## 0.4 基地复用
 

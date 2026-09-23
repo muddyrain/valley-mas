@@ -1,0 +1,21 @@
+[gd_resource type="Resource" format=3]
+
+[ext_resource type="PackedScene" path="res://assets/world/props/city_props_v2/PRP_CITY_032_neglected_planter.glb" id="1_gkxvw"]
+[ext_resource type="Script" path="res://data/world_asset_data.gd" id="2_lppat"]
+
+[resource]
+script = ExtResource("2_lppat")
+id = "PRP_CITY_032_neglected_planter"
+scene = ExtResource("1_gkxvw")
+category = "vegetation"
+footprint = Vector2(1.12, 0.72)
+bounding_size = Vector3(1.12, 0.76, 0.72)
+spawn_weight = 0.0
+allowed_district = PackedStringArray()
+loot_profile = ""
+enemy_profile = ""
+searchable = false
+loot_tags = PackedStringArray()
+mission_tags = PackedStringArray()
+interaction_tags = PackedStringArray()
+environment_tags = PackedStringArray("VEGETATION", "RESIDENTIAL")

@@ -1,0 +1,21 @@
+[gd_resource type="Resource" format=3]
+
+[ext_resource type="PackedScene" path="res://assets/world/props/city_props_v1/PRP_CITY_003_power_pole.glb" id="1_3ss62"]
+[ext_resource type="Script" path="res://data/world_asset_data.gd" id="2_df7kr"]
+
+[resource]
+script = ExtResource("2_df7kr")
+id = "PRP_CITY_003_power_pole"
+scene = ExtResource("1_3ss62")
+category = "road"
+footprint = Vector2(0.72, 0.52)
+bounding_size = Vector3(0.72, 6.2, 0.52)
+spawn_weight = 0.0
+allowed_district = PackedStringArray()
+loot_profile = ""
+enemy_profile = ""
+searchable = false
+loot_tags = PackedStringArray()
+mission_tags = PackedStringArray()
+interaction_tags = PackedStringArray()
+environment_tags = PackedStringArray("ROAD", "TOWN_EDGE")

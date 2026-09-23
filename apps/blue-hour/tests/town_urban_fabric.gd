@@ -272,6 +272,6 @@ func _measure_gaps(town: Dictionary) -> Dictionary:
 				if category == "other":
 					continue
 				var gap: float = row[i].building_bounds.position[axis] - row[i - 1].building_bounds.end[axis]
-				check(gap >= (1.0 if category == "commercial" else 2.0) and gap <= (4.0 if category == "commercial" else 6.0), "Measured outer-contour frontage gap")
+				check(gap >= (1.0 if category == "commercial" else 1.3) and gap <= (1.3 if category == "commercial" else 2.3), "Measured outer-contour frontage gap follows the compact district spacing")
 				result[category].append(gap)
 	return result

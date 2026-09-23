@@ -1,0 +1,21 @@
+[gd_resource type="Resource" format=3]
+
+[ext_resource type="PackedScene" path="res://assets/world/props/city_props_v2/PRP_CITY_023_guardrail_segment.glb" id="1_4318b"]
+[ext_resource type="Script" path="res://data/world_asset_data.gd" id="2_n2t1j"]
+
+[resource]
+script = ExtResource("2_n2t1j")
+id = "PRP_CITY_023_guardrail_segment"
+scene = ExtResource("1_4318b")
+category = "road"
+footprint = Vector2(2.42, 0.26)
+bounding_size = Vector3(2.42, 0.82, 0.26)
+spawn_weight = 0.0
+allowed_district = PackedStringArray()
+loot_profile = ""
+enemy_profile = ""
+searchable = false
+loot_tags = PackedStringArray()
+mission_tags = PackedStringArray()
+interaction_tags = PackedStringArray()
+environment_tags = PackedStringArray("ROAD", "ROAD_EDGE")

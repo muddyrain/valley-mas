@@ -1,0 +1,21 @@
+[gd_resource type="Resource" format=3]
+
+[ext_resource type="PackedScene" path="res://assets/world/props/city_props_v2/PRP_CITY_012_neighborhood_notice_board.glb" id="1_tlmqk"]
+[ext_resource type="Script" path="res://data/world_asset_data.gd" id="2_mr7kq"]
+
+[resource]
+script = ExtResource("2_mr7kq")
+id = "PRP_CITY_012_neighborhood_notice_board"
+scene = ExtResource("1_tlmqk")
+category = "residential"
+footprint = Vector2(1.28, 0.28)
+bounding_size = Vector3(1.28, 1.72, 0.28)
+spawn_weight = 0.0
+allowed_district = PackedStringArray()
+loot_profile = ""
+enemy_profile = ""
+searchable = false
+loot_tags = PackedStringArray()
+mission_tags = PackedStringArray()
+interaction_tags = PackedStringArray()
+environment_tags = PackedStringArray("RESIDENTIAL", "COMMUNITY")

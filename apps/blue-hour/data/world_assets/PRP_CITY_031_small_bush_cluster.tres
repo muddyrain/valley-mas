@@ -1,0 +1,21 @@
+[gd_resource type="Resource" format=3]
+
+[ext_resource type="PackedScene" path="res://assets/world/props/city_props_v2/PRP_CITY_031_small_bush_cluster.glb" id="1_cgx5i"]
+[ext_resource type="Script" path="res://data/world_asset_data.gd" id="2_mfi3i"]
+
+[resource]
+script = ExtResource("2_mfi3i")
+id = "PRP_CITY_031_small_bush_cluster"
+scene = ExtResource("1_cgx5i")
+category = "vegetation"
+footprint = Vector2(1.42, 0.76)
+bounding_size = Vector3(1.42, 1.04, 0.76)
+spawn_weight = 0.0
+allowed_district = PackedStringArray()
+loot_profile = ""
+enemy_profile = ""
+searchable = false
+loot_tags = PackedStringArray()
+mission_tags = PackedStringArray()
+interaction_tags = PackedStringArray()
+environment_tags = PackedStringArray("VEGETATION", "RESIDENTIAL")

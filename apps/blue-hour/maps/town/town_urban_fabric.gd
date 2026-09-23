@@ -40,9 +40,10 @@ static func _row(town: Dictionary, block: Dictionary, edge: Dictionary, category
 	var previous: String = town.buildings.back().asset if not town.buildings.is_empty() else ""
 	for index: int in count:
 		var candidates: Array[Resource] = []
-		var width_limit := (available - total_width - gap * (count - 1)) / float(count - index)
+		var remaining_gaps: int = maxi(count - index - 1, 0)
+		var width_limit := (available - total_width - gap * remaining_gaps) / float(count - index)
 		for definition: Resource in Assets.get_buildings_by_category(category):
-			var limit := 1 if definition.poi_type in ["supermarket", "pharmacy", "gas_station"] else 4
+			var limit := 1 if definition.poi_type in ["supermarket", "pharmacy", "gas_station"] else 5 if category == "residential" else 4
 			var depth_limit := 9.5 if category == "commercial" else 17.0
 			if block.land_use_type == "RESIDENTIAL_B":
 				depth_limit = 13.5

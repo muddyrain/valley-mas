@@ -18,7 +18,7 @@ static func assign(town: Dictionary) -> void:
 		block.land_use_type = use
 		for row: Dictionary in block.rows:
 			if use == "RESIDENTIAL_B":
-				row.gap = 4.2
+				row.gap = 2.1
 		block.zone_tags = [use]
 		block.space_use = "small_park" if block.type == "COMMUNITY_PARK" else "community_green" if use == "OPEN_SPACE" else "backyard" if use.begins_with("RESIDENTIAL") else "loading_yard" if use == "INDUSTRIAL_SERVICE" else "rear_access"
 

@@ -1,0 +1,21 @@
+[gd_resource type="Resource" format=3]
+
+[ext_resource type="PackedScene" path="res://assets/world/props/city_props_v2/PRP_CITY_011_planter_box_pair.glb" id="1_54ejj"]
+[ext_resource type="Script" path="res://data/world_asset_data.gd" id="2_vaotq"]
+
+[resource]
+script = ExtResource("2_vaotq")
+id = "PRP_CITY_011_planter_box_pair"
+scene = ExtResource("1_54ejj")
+category = "residential"
+footprint = Vector2(1.65, 0.58)
+bounding_size = Vector3(1.65, 0.92, 0.58)
+spawn_weight = 0.0
+allowed_district = PackedStringArray()
+loot_profile = ""
+enemy_profile = ""
+searchable = false
+loot_tags = PackedStringArray()
+mission_tags = PackedStringArray()
+interaction_tags = PackedStringArray()
+environment_tags = PackedStringArray("RESIDENTIAL", "GARDEN")

@@ -1,0 +1,21 @@
+[gd_resource type="Resource" format=3]
+
+[ext_resource type="PackedScene" path="res://assets/world/props/city_props_v1/PRP_CITY_008_cardboard_stack.glb" id="1_rc4tb"]
+[ext_resource type="Script" path="res://data/world_asset_data.gd" id="2_jjxrg"]
+
+[resource]
+script = ExtResource("2_jjxrg")
+id = "PRP_CITY_008_cardboard_stack"
+scene = ExtResource("1_rc4tb")
+category = "industrial"
+footprint = Vector2(1.45, 0.98)
+bounding_size = Vector3(1.45, 1.12, 0.98)
+spawn_weight = 0.0
+allowed_district = PackedStringArray()
+loot_profile = ""
+enemy_profile = ""
+searchable = false
+loot_tags = PackedStringArray()
+mission_tags = PackedStringArray()
+interaction_tags = PackedStringArray()
+environment_tags = PackedStringArray("INDUSTRIAL")
