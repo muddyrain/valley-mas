@@ -35,6 +35,8 @@ SUR_001～SUR_012 均使用 1.65m Runtime Envelope、冻结的 23 骨 `BH_Humano
 
 公共动作唯一入口为 [public_locomotion.tres](../assets/animations/public_locomotion/public_locomotion.tres)。角色目录不得增加 Idle / Walking / Running 副本。SUR_003～SUR_012 的 Trait 资源当前仅承载数据，Runtime 效果未实现。
 
+12 名幸存者的头像与上表 Runtime 模型使用同一 `assets/characters/<character_id>/` 归属目录，统一入口为 `portrait/avatar_square.png`。具体角色绑定由上表的 Definition `portrait_path` 决定，UI 不从文件名或目录顺序推断身份。
+
 
 ## Standard Survivor Template 静态基线
 

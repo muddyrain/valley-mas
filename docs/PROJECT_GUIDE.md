@@ -140,10 +140,11 @@ python3 .agents/skills/encoding-guard/scripts/check_mojibake.py <相关文件>
 
 ## 蓝时归航：原生 Godot
 
-入口为 `apps/blue-hour/project.godot`，使用 Compatibility 渲染，当前验证引擎为 Godot 4.7.2。项目独立于 pnpm/Turbo，不需要额外插件。Windows 启动脚本从 `GODOT_BIN`、PATH 或用户 Downloads 的便携目录定位引擎，也接受 `-GodotPath`。
+入口为 `apps/blue-hour/project.godot`，使用 Compatibility 渲染，当前验证引擎为 Godot 4.7.2。项目独立于 pnpm/Turbo，不需要额外插件。环境分工与路径规则见[项目 Development Environment](../apps/blue-hour/README.md#development-environment)。`[Windows]` 启动脚本从 `GODOT_BIN`、PATH 或用户 Downloads 的便携目录定位引擎，也接受 `-GodotPath`。
+
+`[Windows]` 从仓库根目录运行：
 
 ```powershell
-# 仓库根目录执行
 ./apps/blue-hour/run.ps1 -Mode run
 ./apps/blue-hour/run.ps1 -Mode editor
 ./apps/blue-hour/run.ps1 -Mode import
@@ -152,7 +153,7 @@ python3 .agents/skills/encoding-guard/scripts/check_mojibake.py <相关文件>
 ./apps/blue-hour/run.ps1 -Mode capture
 ./apps/blue-hour/run.ps1 -Mode build
 
-# 已将 Godot 加入 PATH 的环境可直接执行
+# [Windows] 已将 Godot 加入 PATH 时可直接执行
 godot --headless --path apps/blue-hour --editor --import --quit
 godot --headless --path apps/blue-hour --script tests/rules.gd
 godot --headless --path apps/blue-hour --script tests/mission_flow.gd
@@ -167,11 +168,13 @@ godot --headless --path apps/blue-hour --script tests/balance_probe.gd
 godot --headless --path apps/blue-hour --script tests/parallel_routes.gd
 ```
 
+`[macOS]` 使用本机 Godot 对源码进行专项检查时，从仓库根目录执行 `godot --headless --path apps/blue-hour --script tests/camp_roster_recruitment_integration.gd`；Godot 可执行文件路径以本机安装位置为准。此命令不生成 Windows EXE。
+
 `test` 执行资源导入、模型导入/集成，以及规则、行动、单人派遣、并行操作、跨日规则、跨日行动、开局规则和新队伍五日流程八组玩法验证；`day_loop_flow.gd` 包含实际战斗中的五日补给路线、装备路线耗尽储粮以及单人任务边界。`smoke` 启动主场景并在 120 帧后退出。`capture` 依次运行 `tests/art_runtime.gd`、`tests/runtime.gd`、`tests/day_loop_runtime.gd`、`tests/controls_runtime.gd` 和 `tests/new_run_runtime.gd`，使用屏幕外原生窗口及合成输入验证战斗/搜索、持续带队、指向射击、暂停与镜头，以及购买、换装、口粮分配、续玩、减员和结束界面；截图与五组 runtime 报告输出到 `apps/blue-hour/test-output/`。路线诊断 `balance_probe.gd` 记录原有串行路线，`parallel_routes.gd` 在 3 个固定种子且关闭无敌的条件下对照串行三点、并行三点与并行八点；这些记录不作为体验好坏的自动化断言。脚本同时检查退出状态和 Godot 错误日志，避免引擎遇到脚本错误仍返回零而误报通过。
 
 所有自动化、启动检查和独立导出验证使用 `user://test-runs/` 的隔离记录，不覆盖玩家的 `user://homeward/run.json`，也不控制用户当前窗口。当前只在安全屋与待结算节点保存；行动中退出后重试当天，装备奖励保持固定。
 
-`build` 使用匹配引擎版本的 Windows x64 模板，先执行导入及上述模型与玩法测试，再通过 `Windows Desktop` 预设导出资源内嵌的 `apps/blue-hour/build/BlueHourHomeward.exe`。随后将 EXE 复制到独立验证目录，在不带源码和独立 PCK 的情况下分别完成基地、主菜单的 Headless 与屏幕外原生启动，以及内嵌模型检查，成功后记录 `BUILD-INFO.json`。试玩只需该 EXE，无需 Godot 编辑器；每次功能交付都更新构建。Debug Menu 在当前试玩构建中保留。
+`[Windows]` `build` 使用匹配引擎版本的 Windows x64 模板，先执行导入及上述模型与玩法测试，再通过 `Windows Desktop` 预设导出资源内嵌的 `apps/blue-hour/build/BlueHourHomeward.exe`。随后将 EXE 复制到独立验证目录，在不带源码和独立 PCK 的情况下分别完成基地、主菜单的 Headless 与屏幕外原生启动，以及内嵌模型检查，成功后记录 `BUILD-INFO.json`。试玩只需该 EXE，无需 Godot 编辑器；每次功能交付都更新构建。Debug Menu 在当前试玩构建中保留。
 
 范围、操作与资源入口见 [蓝时归航 README](../apps/blue-hour/README.md)，实际验证记录见 [VALIDATION](../apps/blue-hour/docs/VALIDATION.md)。缓存、构建与本地验证产物由项目 `.gitignore` 排除。
 

@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://dct5eqobpwsvv"
-path="res://.godot/imported/SUR_008_Cheng_Mo_avatar.png-964631fd0b374fa00127ea55aa04dba7.ctex"
+uid="uid://csia5o3vwx2sx"
+path="res://.godot/imported/avatar_square.png-fc44f4ef47d136bf32e462140f2d4a10.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/ui/camp/survivor_avatars/SUR_008_Cheng_Mo_avatar.png"
-dest_files=["res://.godot/imported/SUR_008_Cheng_Mo_avatar.png-964631fd0b374fa00127ea55aa04dba7.ctex"]
+source_file="res://assets/characters/lin_jianyue/portrait/avatar_square.png"
+dest_files=["res://.godot/imported/avatar_square.png-fc44f4ef47d136bf32e462140f2d4a10.ctex"]
 
 [params]
 

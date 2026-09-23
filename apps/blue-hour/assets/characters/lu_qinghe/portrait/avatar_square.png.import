@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://bmpcy6tabhxxg"
-path="res://.godot/imported/SUR_007_Gu_YuAn_avatar.png-9e0a91d16d4a9e57e99f787dd9c49607.ctex"
+uid="uid://c2uu585yruxs4"
+path="res://.godot/imported/avatar_square.png-d4a09a0dbc9d79d817972ef329640362.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/ui/camp/survivor_avatars/SUR_007_Gu_YuAn_avatar.png"
-dest_files=["res://.godot/imported/SUR_007_Gu_YuAn_avatar.png-9e0a91d16d4a9e57e99f787dd9c49607.ctex"]
+source_file="res://assets/characters/lu_qinghe/portrait/avatar_square.png"
+dest_files=["res://.godot/imported/avatar_square.png-d4a09a0dbc9d79d817972ef329640362.ctex"]
 
 [params]
 

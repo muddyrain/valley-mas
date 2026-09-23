@@ -1359,6 +1359,40 @@ M03: TECHNICALLY COMPLETE；Town Structure: FROZEN。停止于人工视觉审核
 - [x] 专项 Camp roster 集成测试 0 failures；未修改 SurvivorDefinition、Trait/Aura/Periodic、XP/Level、角色资源或动画。
 
 详见 [Survivor Camp Roster Integration 报告](SURVIVOR_CAMP_ROSTER_INTEGRATION_REPORT.md)。
+
+## 2026-09-23：Camp Survivor Framework 显示链修正
+
+- [x] M04 只接收 `SurvivorRosterManager.get_recruited_survivors()`；已发现与未解锁角色不显示，标题改为“营地成员 N”，不再以 12 人角色池作分母。
+- [x] 卡片和 M05 详情按同一 `survivor_id` 绑定 Definition 名称、Profile 经历、头像、Runtime 等级、Trait 与已招募状态；刷新时重取当前详情，原成员不在名单时关闭详情。
+- [x] Camp Portrait Source 修正：12 名幸存者的 `SurvivorDefinition.portrait` 均指向正式 `assets/ui/camp/survivor_avatars/` PNG。`SurvivorRosterAdapter` 从对应 Definition 读取路径，M04 卡片与 M05 详情复用同一纹理；`CampStyle.portrait` 和 Expedition 队员卡也读取 Definition，旧截图 fallback 已移除。SUR_001 / SUR_002 分别生成 1600×900 选中截图；验收记录见 [任务报告](reports/2026-09-23_camp_survivor_portrait_fix_report.md)。
+- [x] `[macOS]` Godot 4.7.2 原生 1600×900 Camp 截图；Camp Roster 集成、M05 详情和头像绑定专项均为 0 failures，招募状态专项 17 checks / 0 failures，Profile 专项 91 checks / 0 failures。
+- [ ] `[Windows]` 重新构建 `build/BlueHourHomeward.exe` 并验证独立程序启动。本次工作环境无已连接 Windows 设备，不能将 macOS 验证算作 Windows 构建通过。
+
+2026-09-22 的 `RECRUITED / 12` 和三种状态全部出现在 Camp 的描述仅为历史实现记录，已由本条替代。开发环境分工见 [README](../README.md#development-environment)。
+
+## 2026-09-23：Survivor 头像归属迁移
+
+- [x] 12 张正式头像无重绘、无重复地迁入各自 `assets/characters/<character_id>/portrait/avatar_square.png`；12 个 Definition 的 `portrait_path` 改为新路径。Camp 与 Expedition 继续从 Definition 读取，同一 `survivor_id` 的名称、Trait 和头像绑定保持一致；旧 UI 目录只保留 Deprecated 说明。
+- [x] `[macOS]` Godot 重新导入、Camp 原生 1600×900 roster / detail / hover / selection 验证、Expedition HUD、Trait Foundation 与 Rules 专项通过。截图和资源清单见 [迁移报告](reports/2026-09-23_survivor_portrait_migration_report.md)。
+- [ ] `[Windows]` Windows environment required：正式构建并验证独立程序启动；当前无可访问的 Windows 设备，按用户此前选择先交付 macOS 结果。
+
+## 2026-09-23：Camp Survivor Panel 展示版
+
+- [x] M04 改为头像主导的竖向角色小卡：仅保留姓名与等级，按 `survivor_id` 选中时显示蓝色高亮；成员栏按已招募人数收紧高度，超过四张卡时提供轻量滚动。标题仍仅显示“营地成员 N”。
+- [x] M05 重排为角色展示卡：大幅正式头像、中文名与 ID/等级、现有角色标签与 Profile 摘要、装备与突出战力、四维属性条、Trait 能力区和具备 normal / hover / disabled 样式的操作按钮。缺少可选字段时隐藏对应展示位。
+- [x] 继续消费 `SurvivorRosterManager → SurvivorDefinition / SurvivorProfile → SurvivorRosterAdapter` 的视图数据；roster 与 detail 复用同一 Definition `portrait_path` 纹理，不改招募、Trait、Progression 或装备逻辑。
+- [x] `[macOS]` Godot 4.7.2 导入、Camp Roster 集成、M05 详情和头像绑定专项通过；1600×900 默认态与 SUR_001 / SUR_002 选中态已截图。见 [本轮报告](reports/2026-09-23_camp_survivor_panel_report.md)。
+- [ ] `[Windows]` 待可访问 Windows 设备后执行正式 build 与独立程序启动验收。
+
+## 2026-09-23：Camp Survivor Detail 打开与关闭动画
+
+- [x] 首次点选成员：M05 整体从右侧 24 px 淡入并落位（0.26 秒），内容短暂错峰淡入；再次点击已选卡片：内容先淡出，面板向右 18 px 收回并隐藏（0.22 秒）。
+- [x] 切换不同成员时保持面板外壳稳定，内部内容先淡出 0.08 秒、按最新 `survivor_id` 更新，再以 0.16 秒淡入；连续点选与关闭途中重开会收敛到最后一次有效选择。
+- [x] 动画只作用于 Camp HUD，继续消费现有 `SurvivorRosterAdapter` 的 ID 视图，未修改 Survivor 数据、portrait 绑定、招募与成长逻辑。项目 AGENTS 的报告要求补充 UI 交互、截图与数据链记录。
+- [x] `[macOS]` Godot 4.7.2 导入、动画专项、Camp Roster 集成、M05 数据与头像绑定专项均通过；1600×900 默认、打开、切换、关闭和过渡中途帧见 [动画报告](reports/2026-09-23_camp_survivor_detail_open_close_animation_report.md)。
+- [x] 附件《Camp Survivor Panel V2 目标效果图视觉重构》合并验收：Roster、Detail、动画与正式 `survivor_id` 数据链均已对照并通过 macOS 原生复核；见 [合并验收报告](reports/2026-09-23_camp_survivor_panel_visual_rework_report.md)。
+- [ ] `[Windows]` 待可访问 Windows 设备后执行正式 build 与独立程序启动验收。
+
 ## 2026-09-22：蓝时归航 Expedition Map Phase 1 + Phase 2
 
 - [x] MiniMap 正式化：移除地图名、版本、Seed、Block ID 和 Debug Label 绘制路径；正式地图只保留地图几何、幸存者、POI、蓝时号和已发现地点标记。

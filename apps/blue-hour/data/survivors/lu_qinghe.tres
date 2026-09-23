@@ -13,6 +13,7 @@ description = "陆清禾参加过长期基础急救培训，也经常参与大�
 role_tags = ["治疗", "生存"]
 trait_id = "emergency_response"
 model_path = "res://assets/characters/lu_qinghe/runtime/lu_qinghe.glb"
+portrait_path = "res://assets/characters/lu_qinghe/portrait/avatar_square.png"
 max_hp = 100.0
 move_speed = 2.8
 color = Color(0.42, 0.69, 0.62, 1)

@@ -1,8 +1,21 @@
 [gd_scene load_steps=10 format=3]
 
 [ext_resource type="Script" path="res://ui/camp_hud/survivor_roster.gd" id="1_script"]
-[ext_resource type="Texture2D" path="res://assets/ui/camp/m04/m04_roster_panel_bg.png" id="2_background"]
 [ext_resource type="PackedScene" path="res://ui/camp_hud/portrait_slot.tscn" id="3_slot"]
+
+[sub_resource type="StyleBoxFlat" id="Rail"]
+bg_color = Color(0.055, 0.14, 0.21, 0.94)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.35, 0.67, 0.82, 0.76)
+corner_radius_top_left = 8
+corner_radius_top_right = 8
+corner_radius_bottom_right = 8
+corner_radius_bottom_left = 8
+shadow_color = Color(0.015, 0.06, 0.12, 0.48)
+shadow_size = 7
 
 [sub_resource type="StyleBoxEmpty" id="Transparent"]
 
@@ -42,14 +55,14 @@ corner_radius_bottom_left = 3
 
 [node name="M04_SurvivorRoster" type="Panel"]
 offset_right = 118.0
-offset_bottom = 436.0
+offset_bottom = 500.0
 mouse_filter = 0
 texture_filter = 2
 theme = SubResource("RosterTheme")
 theme_override_styles/panel = SubResource("Transparent")
 script = ExtResource("1_script")
 
-[node name="Background" type="TextureRect" parent="."]
+[node name="Background" type="Panel" parent="."]
 layout_mode = 0
 anchors_preset = 15
 anchor_right = 1.0
@@ -57,9 +70,7 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
-texture = ExtResource("2_background")
-expand_mode = 1
-stretch_mode = 5
+theme_override_styles/panel = SubResource("Rail")
 
 [node name="Header" type="Control" parent="."]
 layout_mode = 0
@@ -74,7 +85,7 @@ offset_top = 6.0
 offset_right = 68.0
 offset_bottom = 32.0
 mouse_filter = 2
-text = "幸存者"
+text = "营地成员"
 vertical_alignment = 1
 
 [node name="Count" type="Label" parent="Header"]
@@ -84,7 +95,7 @@ offset_top = 6.0
 offset_right = 106.0
 offset_bottom = 32.0
 mouse_filter = 2
-text = "0/0"
+text = "0"
 horizontal_alignment = 2
 vertical_alignment = 1
 
@@ -93,7 +104,7 @@ layout_mode = 0
 offset_left = 6.0
 offset_top = 38.0
 offset_right = 112.0
-offset_bottom = 430.0
+offset_bottom = 494.0
 mouse_filter = 2
 
 [node name="ScrollContainer" type="ScrollContainer" parent="RosterContainer"]
@@ -111,9 +122,9 @@ vertical_scroll_mode = 3
 layout_mode = 0
 anchor_left = 1.0
 anchor_right = 1.0
-offset_left = -8.0
+offset_left = -5.0
 offset_right = 0.0
-offset_bottom = 392.0
+offset_bottom = 456.0
 mouse_filter = 0
 theme_override_styles/scroll = SubResource("ScrollTrack")
 theme_override_styles/grabber = SubResource("ScrollGrab")
@@ -123,7 +134,7 @@ theme_override_styles/grabber_highlight = SubResource("ScrollGrabHighlight")
 custom_minimum_size = Vector2(100, 0)
 layout_mode = 2
 size_flags_horizontal = 3
-theme_override_constants/separation = 2
+theme_override_constants/separation = 4
 
 [node name="EntryTemplate" parent="RosterContainer/ScrollContainer/VBoxContainer" instance=ExtResource("3_slot")]
 visible = false

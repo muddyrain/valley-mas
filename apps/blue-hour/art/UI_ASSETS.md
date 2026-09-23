@@ -112,11 +112,15 @@ M01 使用独立 Label 渲染东岸营地、中英文日期及两行描述，字
 
 ## 外出 HUD（2026-09-12）
 
-`assets/ui/expedition/` 包含两张 192×192 透明模型头像和八张 40×40 原创线形 SVG（停止、集火、定位、集合、归航、食物、废料、装备）。来源和哈希见该目录的 `sources.json`。头像由 `art/capture_expedition_portraits.gd` 在 Godot 的离屏 SubViewport 中渲染当前用户提供的夏知遥/苏晚星 GLB；GLB 字节、比例和素材风格未改。此处缺正式 Expedition Portrait Asset，当前衍生头像可用于辨识，不冒充用户提供的独立头像插画。优先读取角色已有 portrait_path，空值时由角色模板 ID 选择衍生头像；运行实例 ID 不用作素材 ID。旧测试角色无模型头像时显示姓名首字。
+`assets/ui/expedition/` 保留两张历史 192×192 透明模型截图头像和八张 40×40 原创线形 SVG（停止、集火、定位、集合、归航、食物、废料、装备）。来源和哈希见该目录的 `sources.json`。头像由 `art/capture_expedition_portraits.gd` 在 Godot 的离屏 SubViewport 中渲染夏知遥/苏晚星 GLB；这是历史素材，不再作为当前角色头像或 fallback。正式 Survivor 头像由 `SurvivorDefinition.portrait_path` 指向角色目录中的 PNG；没有头像的旧测试角色仍可显示姓名首字。
 
 六个技能继续使用原 100×100 正式图标；武器直接读取同期 WeaponDefinition.icon()。切角面板是共享的 Godot StyleBox 绘制，未导入 Deadly Days 图标、字体、颜色或 UI 贴图。屏幕适配与验收见 [外出视觉报告](../docs/EXPEDITION_VISUAL_REPORT.md)。
 
-上述为 HUD 1 历史来源。当前正式 Expedition 已由下述 HUD 2.0 替换，旧头像回退与其他场景仍需的旧资源保留。
+上述为 HUD 1 历史来源。当前正式 Expedition 已由下述 HUD 2.0 替换；旧截图资源仅保留历史来源，不参与当前头像绑定。
+
+## Survivor 正式头像归属（2026-09-23）
+
+12 张正式 PNG 已从 `assets/ui/camp/survivor_avatars/` 迁移至各自 `assets/characters/<character_id>/portrait/avatar_square.png`，原 PNG 字节保持不变。`SurvivorDefinition.portrait_path` 是唯一头像资源引用；Camp M04、M05 与 Expedition 队员卡都消费角色数据，UI 不扫描图片目录。旧 UI 目录只保留弃用说明，具体 ID、路径和截图见 [迁移报告](../docs/reports/2026-09-23_survivor_portrait_migration_report.md)。
 
 ## Expedition HUD 2.0 正式素材
 

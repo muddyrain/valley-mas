@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://yctn45d47onh"
-path="res://.godot/imported/SUR_004_Lu_Qinghe_avatar.png-752e7707cfc78dcf73a63420550c2aac.ctex"
+uid="uid://cedmcdsmrlxsb"
+path="res://.godot/imported/avatar_square.png-c46025585535374c97953a8f4a8ab88d.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/ui/camp/survivor_avatars/SUR_004_Lu_Qinghe_avatar.png"
-dest_files=["res://.godot/imported/SUR_004_Lu_Qinghe_avatar.png-752e7707cfc78dcf73a63420550c2aac.ctex"]
+source_file="res://assets/characters/song_shiyu/portrait/avatar_square.png"
+dest_files=["res://.godot/imported/avatar_square.png-c46025585535374c97953a8f4a8ab88d.ctex"]
 
 [params]
 

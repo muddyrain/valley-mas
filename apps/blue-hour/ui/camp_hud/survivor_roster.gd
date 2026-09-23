@@ -2,6 +2,7 @@ extends Panel
 ## Data-driven Camp roster presentation. Campaign state remains owned by the caller.
 
 signal survivor_selected(survivor_id: String)
+signal survivor_reselected(survivor_id: String)
 ## Compatibility signal for existing presentation probes; selection is ID-based internally.
 signal selection_changed(index: int)
 
@@ -25,6 +26,8 @@ var _syncing_scrollbar: bool = false
 func _ready() -> void:
 	_native_scrollbar.visible = false
 	_overlay_scrollbar.value_changed.connect(_on_overlay_scroll_changed)
+	resized.connect(_layout_cards)
+	_layout_cards()
 	_rebuild()
 	_sync_overlay_scrollbar()
 
@@ -39,15 +42,23 @@ func configure(catalog: RefCounted, campaign: RefCounted) -> void:
 func refresh() -> void:
 	_rebuild()
 
+func preferred_height() -> float:
+	return minf(500.0, 44.0 + float(_views.size()) * 114.0)
+
+func _layout_cards() -> void:
+	$RosterContainer.offset_bottom = size.y - 6.0
+	_overlay_scrollbar.offset_bottom = size.y - 44.0
+
 func _rebuild() -> void:
 	if not is_node_ready() or _catalog == null:
 		return
 	_views = RosterAdapter.build(_catalog, _campaign)
-	var recruited_count := 0
-	for view: Dictionary in _views:
-		if bool(view.get("is_recruited", false)):
-			recruited_count += 1
-	$Header/Count.text = "%d/%d" % [recruited_count, _views.size()]
+	$Header/Count.text = str(_views.size())
+	if get_survivor_view_data(selected_survivor_id).is_empty():
+		selected_survivor_id = ""
+		selected_index = -1
+	else:
+		selected_index = _index_for_id(selected_survivor_id)
 	var container := $RosterContainer/ScrollContainer/VBoxContainer as VBoxContainer
 	for child: Node in container.get_children():
 		if child.name != "EntryTemplate":
@@ -58,7 +69,7 @@ func _rebuild() -> void:
 		entry.name = "SurvivorEntry_" + str(view.get("survivor_id", ""))
 		container.add_child(entry)
 		entry.bind_survivor(view)
-		entry.pressed.connect(_select_survivor.bind(str(view.get("survivor_id", ""))))
+		entry.pressed.connect(_on_entry_pressed.bind(str(view.get("survivor_id", ""))))
 		_entries.append(entry)
 	_refresh_selection()
 	_scroll.scroll_vertical = 0
@@ -103,6 +114,17 @@ func _select_survivor(survivor_id: String) -> void:
 	_refresh_selection()
 	survivor_selected.emit(survivor_id)
 	selection_changed.emit(selected_index)
+
+func _on_entry_pressed(survivor_id: String) -> void:
+	if selected_survivor_id == survivor_id:
+		survivor_reselected.emit(survivor_id)
+		return
+	_select_survivor(survivor_id)
+
+func clear_selection() -> void:
+	selected_survivor_id = ""
+	selected_index = -1
+	_refresh_selection()
 
 func select_survivor(survivor_id: String) -> void:
 	_select_survivor(survivor_id)

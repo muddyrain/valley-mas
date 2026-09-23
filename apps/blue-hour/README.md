@@ -29,9 +29,16 @@ Godot 4.x + GDScript 的 **0.5.0 道具与技能扩充试玩**。在原有 Resou
 
 ## 打开与验证
 
-试玩可直接双击 `build/BlueHourHomeward.exe`，无需安装 Godot；资源内嵌在单个 Windows x64 可执行文件中。开发时使用 Godot 打开 `project.godot`。本轮使用 Godot **4.7.2.stable.official.ed1daf0bf**，Compatibility 渲染。项目独立于 pnpm/Turbo，不需要额外插件、下载美术或第三方运行依赖。
+`[Windows]` 试玩可直接双击 `build/BlueHourHomeward.exe`，无需安装 Godot；资源内嵌在单个 Windows x64 可执行文件中。`[Windows]` 或 `[macOS]` 开发时可使用 Godot 打开 `project.godot`。本轮使用 Godot **4.7.2.stable.official.ed1daf0bf**，Compatibility 渲染。项目独立于 pnpm/Turbo，不需要额外插件、下载美术或第三方运行依赖。
 
-Windows 的 `run.ps1` 支持 `run`、`editor`、`art`、`import`、`test`、`smoke`、`capture`、`build`；自动查找 `GODOT_BIN`、PATH 或 Downloads 中的便携 Godot，也接受 `-GodotPath`。`build` 需要匹配引擎版本的 Windows x64 导出模板，依次执行模型与地图集成、规则、行动、派遣、并行操作、跨日规则、跨日行动、开局规则、新队伍五日流程和效果系统验证、Release 导出、独立 EXE 的 Headless 和原生启动以及内嵌模型检查，成功后更新 `build/BUILD-INFO.json`。`capture` 运行美术展示、行动、跨日界面、并行操作、开局、首页和效果系统七组原生验证。每次功能交付都构建最新 EXE。完整可复制命令集中在[仓库项目指南](../../docs/PROJECT_GUIDE.md#蓝时归航原生-godot)。
+`[Windows]` `run.ps1` 支持 `run`、`editor`、`art`、`import`、`test`、`smoke`、`capture`、`build`；自动查找 `GODOT_BIN`、PATH 或 Downloads 中的便携 Godot，也接受 `-GodotPath`。`build` 需要匹配引擎版本的 Windows x64 导出模板，依次执行模型与地图集成、规则、行动、派遣、并行操作、跨日规则、跨日行动、开局规则、新队伍五日流程和效果系统验证、Release 导出、独立 EXE 的 Headless 和原生启动以及内嵌模型检查，成功后更新 `build/BUILD-INFO.json`。`capture` 运行美术展示、行动、跨日界面、并行操作、开局、首页和效果系统七组原生验证。每次功能交付都构建最新 EXE。完整可复制命令集中在[仓库项目指南](../../docs/PROJECT_GUIDE.md#蓝时归航原生-godot)。
+
+## Development Environment
+
+所有环境相关操作及命令示例都标注 `[Windows]` 或 `[macOS]`，并使用对应系统的路径格式。不得把 Windows 路径直接复制到 macOS，也不得把 macOS 路径直接复制到 Windows；构建与验证按各自平台的流程执行。
+
+- `[Windows]` Godot 主运行测试、Windows 构建及独立程序启动验证、Blender 模型处理、Meshy 资源处理、GPU 渲染测试。使用 `run.ps1` 和 Windows x64 导出模板。
+- `[macOS]` 代码开发、文档维护、Git 操作、Codex 辅助开发、UI 与逻辑修改。可用本机 Godot 做专项验证；这不替代 `[Windows]` 构建与独立程序验收。
 
 ## 操作
 

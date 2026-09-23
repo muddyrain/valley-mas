@@ -1,5 +1,7 @@
 # Survivor Camp Roster Integration V1
 
+> 2026-09-23 更新：本报告记录 2026-09-22 的旧展示规则。当前 Camp 仅显示 `get_recruited_survivors()`，标题为“营地成员 N”；已发现与未解锁角色不进入 Camp 列表。当前验收以 `docs/PLAN.md` 的 2026-09-23 条目和 `tests/camp_roster_recruitment_integration.gd` 为准。
+
 ## Architecture
 
 Camp 的 `M04_SurvivorRoster` 通过 `SurvivorRosterAdapter` 读取 `Campaign.roster_manager()`。适配层调用 `get_recruited_survivors()`、`get_discovered_survivors()` 和 `get_all_survivors()` 生成稳定的动态视图，已招募角色排在前面，数量标题使用 `RECRUITED / TOTAL`。

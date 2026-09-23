@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://bs7gddx8jct1v"
-path="res://.godot/imported/SUR_001_Xia_Zhiyao_avatar.png-66bdcfb5bfe4b9da8af888ea83efae0c.ctex"
+uid="uid://0w1dls283uic"
+path="res://.godot/imported/avatar_square.png-5efd13b17ef7f14b8b027c94131334f6.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/ui/camp/survivor_avatars/SUR_001_Xia_Zhiyao_avatar.png"
-dest_files=["res://.godot/imported/SUR_001_Xia_Zhiyao_avatar.png-66bdcfb5bfe4b9da8af888ea83efae0c.ctex"]
+source_file="res://assets/characters/gu_yuan/portrait/avatar_square.png"
+dest_files=["res://.godot/imported/avatar_square.png-5efd13b17ef7f14b8b027c94131334f6.ctex"]
 
 [params]
 

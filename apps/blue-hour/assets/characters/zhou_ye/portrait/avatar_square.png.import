@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://dxdh7io5ugwsi"
-path="res://.godot/imported/SUR_002_Su_Wanxing_avatar.png-3a3f5d83416a2ddb5fe06e94a45d8e06.ctex"
+uid="uid://d374gijri7p56"
+path="res://.godot/imported/avatar_square.png-3d7ca200b26e5ce8d27a619b32272fca.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/ui/camp/survivor_avatars/SUR_002_Su_Wanxing_avatar.png"
-dest_files=["res://.godot/imported/SUR_002_Su_Wanxing_avatar.png-3a3f5d83416a2ddb5fe06e94a45d8e06.ctex"]
+source_file="res://assets/characters/zhou_ye/portrait/avatar_square.png"
+dest_files=["res://.godot/imported/avatar_square.png-3d7ca200b26e5ce8d27a619b32272fca.ctex"]
 
 [params]
 

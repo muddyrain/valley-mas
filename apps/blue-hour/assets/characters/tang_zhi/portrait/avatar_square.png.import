@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://bqqvlqgwy0wfg"
-path="res://.godot/imported/SUR_009_Zhou_Ye_avatar.png-60a6d2ede87250dfe1e3ae748a0ad3ae.ctex"
+uid="uid://d3r6gvlv1oyud"
+path="res://.godot/imported/avatar_square.png-6ab16117e233a67335e529d40693ad79.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/ui/camp/survivor_avatars/SUR_009_Zhou_Ye_avatar.png"
-dest_files=["res://.godot/imported/SUR_009_Zhou_Ye_avatar.png-60a6d2ede87250dfe1e3ae748a0ad3ae.ctex"]
+source_file="res://assets/characters/tang_zhi/portrait/avatar_square.png"
+dest_files=["res://.godot/imported/avatar_square.png-6ab16117e233a67335e529d40693ad79.ctex"]
 
 [params]
 

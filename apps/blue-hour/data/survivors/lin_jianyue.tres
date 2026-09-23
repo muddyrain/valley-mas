@@ -13,6 +13,7 @@ description = "林见月并没有什么军事背景，只是比一般人更习�
 role_tags = ["近距离战斗"]
 trait_id = "danger_instinct"
 model_path = "res://assets/characters/lin_jianyue/runtime/lin_jianyue.glb"
+portrait_path = "res://assets/characters/lin_jianyue/portrait/avatar_square.png"
 max_hp = 100.0
 move_speed = 2.8
 color = Color(0.82, 0.36, 0.42, 1)

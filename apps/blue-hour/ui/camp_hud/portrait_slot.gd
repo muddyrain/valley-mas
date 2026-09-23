@@ -11,20 +11,17 @@ var _held: bool = false
 var _transition: Tween
 
 func bind_survivor(view_data: Dictionary) -> void:
-	var is_recruited := bool(view_data.get("is_recruited", false))
-	var is_discovered := bool(view_data.get("is_discovered", false))
 	$PortraitTexture.texture = view_data.get("portrait") as Texture2D
 	$Fallback.visible = $PortraitTexture.texture == null
-	$Fallback/Initials.text = "?" if not is_recruited and not is_discovered else _initials(str(view_data.get("display_name", "")))
+	$Fallback/Initials.text = _initials(str(view_data.get("display_name", "")))
 	$NameLabel.text = str(view_data.get("display_name", ""))
 	var survivor_id := str(view_data.get("survivor_id", ""))
 	var english_name := str(view_data.get("name_en", survivor_id)).replace("_", " ")
-	$EnglishLabel.text = english_name if is_recruited else survivor_id
-	var role_tags := str(view_data.get("tags", ""))
-	$MetaLabel.text = "Lv.%02d · %s" % [int(view_data.get("level", 1)), role_tags] if is_recruited else str(view_data.get("status", ""))
-	$MetaLabel.modulate.a = 1.0 if is_recruited else 0.72
-	$NameLabel.modulate.a = 1.0 if is_recruited or is_discovered else 0.72
-	$EnglishLabel.modulate.a = 0.86 if is_recruited else 0.62
+	$EnglishLabel.text = english_name
+	$MetaLabel.text = "Lv.%d" % int(view_data.get("level", 1))
+	$MetaLabel.modulate.a = 1.0
+	$NameLabel.modulate.a = 1.0
+	$EnglishLabel.modulate.a = 0.86
 
 func _initials(display_name: String) -> String:
 	if display_name.is_empty():
@@ -71,7 +68,7 @@ func _update_visual(immediate: bool = false) -> void:
 	var meta_label: Label = $MetaLabel
 	frame.texture = SELECTED_FRAME if selected else NORMAL_FRAME
 	var tint: Color = Color.WHITE if selected else (HOVER_TINT if _hovered else NORMAL_TINT)
-	var portrait_tint := Color(1.06, 1.06, 1.06, 1) if _hovered and not selected else Color.WHITE
+	var portrait_tint := Color.WHITE if selected else (Color(0.94, 0.97, 1.0, 1.0) if _hovered else Color(0.72, 0.78, 0.84, 1.0))
 	var info_tint := Color(1.10, 1.14, 1.16, 1) if selected else (Color(1.05, 1.08, 1.10, 1) if _hovered else Color(0.94, 0.97, 0.98, 1))
 	var name_tint := Color(1.10, 1.16, 1.18, 1) if selected else Color.WHITE
 	var target_scale := Vector2.ONE * (0.98 if _held else (1.02 if _hovered and not selected else 1.0))

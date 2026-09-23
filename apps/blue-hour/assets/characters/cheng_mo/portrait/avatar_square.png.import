@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://bmdnyn35253n8"
-path="res://.godot/imported/SUR_005_Shen_Yanchuan_avatar.png-2f65a5a2400194cefd129cae0a06669d.ctex"
+uid="uid://bo50c2b1ae7d2"
+path="res://.godot/imported/avatar_square.png-b02e1bfc48dbaa702e668ecc4e02613e.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/ui/camp/survivor_avatars/SUR_005_Shen_Yanchuan_avatar.png"
-dest_files=["res://.godot/imported/SUR_005_Shen_Yanchuan_avatar.png-2f65a5a2400194cefd129cae0a06669d.ctex"]
+source_file="res://assets/characters/cheng_mo/portrait/avatar_square.png"
+dest_files=["res://.godot/imported/avatar_square.png-b02e1bfc48dbaa702e668ecc4e02613e.ctex"]
 
 [params]
 

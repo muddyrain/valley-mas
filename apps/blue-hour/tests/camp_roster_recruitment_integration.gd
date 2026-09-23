@@ -7,6 +7,7 @@ const SaveStore := preload("res://core/save_store.gd")
 const Roster := preload("res://data/survivor_roster_manager.gd")
 
 const SAVE_PATH := "user://test-runs/camp-roster-integration.json"
+const OUTPUT := "res://test-output/camp-survivor-panel/"
 
 var failures: Array[String] = []
 var app: Node
@@ -16,6 +17,7 @@ func _initialize() -> void:
 	run.call_deferred()
 
 func run() -> void:
+	root.size = Vector2i(1600, 900)
 	catalog = Catalog.new()
 	app = MAIN.instantiate()
 	app.save_path = SAVE_PATH
@@ -28,34 +30,61 @@ func run() -> void:
 
 	var hud: Control = app.camp_ui
 	var roster: Control = hud.get_node("M04_SurvivorRoster")
+	var detail: Control = hud.get_node("M05_SurvivorDetail")
 	var entries: Array[Node] = roster.find_children("SurvivorEntry_*", "Button", true, false)
-	_check(entries.size() == 12, "Camp builds one dynamic entry for every catalog Survivor")
-	_check(roster.get_node("Header/Count").text == "2/12", "Initial Camp count is recruited/total")
+	var entry_001 := roster.find_child("SurvivorEntry_SUR_001", true, false) as Button
+	var entry_002 := roster.find_child("SurvivorEntry_SUR_002", true, false) as Button
+	_check(entries.size() == 2, "Camp builds entries only for recruited Survivors")
+	_check(roster.get_node("Header/Title").text == "营地成员" and roster.get_node("Header/Count").text == "2", "Camp shows current member count")
 	_check(roster.get_survivor_view_data("SUR_001").get("is_recruited", false), "SUR_001 is a recruited view")
 	_check(roster.get_survivor_view_data("SUR_001").get("display_name", "") == "夏知遥", "Recruited view exposes authored name")
 	_check(roster.get_survivor_view_data("SUR_001").get("trait_name", "") == "搜寻直觉", "Recruited view exposes authored Trait")
-	_check(entries[0].get_node("EnglishLabel").text == "搜寻直觉", "Camp slot displays Trait name")
-	_check(entries[0].get_node("MetaLabel").text.contains("已招募"), "Camp slot displays recruitment state")
-	_check(roster.get_survivor_view_data("SUR_003").get("display_name", "") == "未知幸存者", "Locked view hides complete identity")
-	_check(roster.get_survivor_view_data("SUR_003").get("portrait") == null, "Locked view hides portrait")
-	_check(roster.get_survivor_view_data("SUR_003").get("status", "") == "未知幸存者", "Locked view exposes unknown status")
+	_check(roster.get_survivor_view_data("SUR_003").is_empty(), "Unrecruited Survivor has no Camp view")
+	_check(roster.find_child("SurvivorEntry_SUR_003", true, false) == null, "Unrecruited Survivor has no Camp card")
+	_check(entry_001.get_node("NameLabel").text == "夏知遥", "SUR_001 card shows Xia Zhiyao")
+	_check(entry_001.get_node("MetaLabel").text == "Lv.1", "Roster card keeps a compact level label")
+	_check(not entry_001.get_node("EnglishLabel").visible and not entry_001.get_node("StatusDots").visible, "Roster cards prioritize the portrait")
+	_check(entry_001.size.y > entry_001.size.x, "Roster cards use a vertical portrait layout")
+	_check(str(entry_001.get_node("PortraitTexture").texture.resource_path) == "res://assets/characters/xia_zhiyao/portrait/avatar_square.png", "SUR_001 card uses Xia Zhiyao's character portrait")
+	_check(entry_002.get_node("NameLabel").text == "苏晚星", "SUR_002 card shows Su Wanxing")
+	_check(str(entry_002.get_node("PortraitTexture").texture.resource_path) == "res://assets/characters/su_wanxing/portrait/avatar_square.png", "SUR_002 card uses Su Wanxing's character portrait")
+	_check(not detail.visible, "Default Camp view has no detail panel")
+	await _capture("camp-default-1600x900.png")
+	roster.select_survivor("SUR_001")
+	await create_timer(0.35).timeout
+	_check(detail.survivor_id == "SUR_001" and detail.visible, "Detail opens from selected Survivor ID")
+	_check(detail.get_node("HeaderPanel/SurvivorName").text == "夏知遥", "Detail name follows selected ID")
+	_check(detail.get_node("HeaderPanel/SurvivorNameEn").text.contains("SUR_001") and detail.get_node("HeaderPanel/SurvivorNameEn").text.contains("Lv.1"), "Detail ID and level follow selected ID")
+	_check(detail.get_node("TraitPanel/TraitName").text.contains("搜寻直觉"), "Detail Trait follows selected ID")
+	_check(catalog.by_id(catalog.profiles, "SUR_001").before_apocalypse.begins_with(detail.get_node("BackgroundPanel/BackgroundDescription").text.left(6)), "Detail narrative follows selected Profile ID")
+	_check(detail.get_node("HeaderPanel/PortraitContainer/HalfPortrait").texture == entry_001.get_node("PortraitTexture").texture, "Detail portrait matches selected card")
+	_check(detail.get_global_rect().size == Vector2(378, 500), "Detail uses the presentation card footprint")
+	await _capture("camp-sur001-1600x900.png")
+	roster.select_survivor("SUR_002")
+	await create_timer(0.35).timeout
+	_check(detail.survivor_id == "SUR_002" and detail.get_node("HeaderPanel/SurvivorName").text == "苏晚星", "SUR_002 detail shows Su Wanxing")
+	_check(detail.get_node("HeaderPanel/PortraitContainer/HalfPortrait").texture == entry_002.get_node("PortraitTexture").texture, "SUR_002 detail uses the card portrait")
+	await _capture("camp-sur002-1600x900.png")
 
 	_check(app.campaign.discover_survivor("SUR_004"), "Roster discovery changes ownership state")
 	hud.refresh_roster()
 	await _frames(2)
 	var discovered: Dictionary = roster.get_survivor_view_data("SUR_004")
-	_check(discovered.get("is_discovered", false), "Discovered view reflects DISCOVERED state")
-	_check(discovered.get("display_name", "") == "陆清禾", "Discovered view exposes discovered name")
-	_check(str(discovered.get("status", "")).contains("已发现"), "Discovered view shows waiting status")
+	_check(discovered.is_empty(), "Discovered Survivor stays outside Camp")
+	_check(roster.get_node("Header/Count").text == "2", "Discovery does not change Camp count")
 
 	_check(app.campaign.recruit_survivor("SUR_004"), "Roster recruitment changes ownership state")
 	hud.refresh_roster()
 	await _frames(2)
-	_check(roster.get_node("Header/Count").text == "3/12", "Recruitment refresh updates count")
+	_check(roster.get_node("Header/Count").text == "3", "Recruitment refresh updates count")
 	var recruited: Dictionary = roster.get_survivor_view_data("SUR_004")
 	_check(recruited.get("is_recruited", false), "Recruited view reflects RECRUITED state")
 	_check(recruited.get("display_name", "") == "陆清禾", "Recruited view exposes authored name")
 	_check(str(recruited.get("status", "")).contains("已招募"), "Recruited view shows recruited status")
+	roster.select_survivor("SUR_004")
+	await create_timer(0.35).timeout
+	_check(detail.survivor_id == "SUR_004" and detail.get_node("HeaderPanel/SurvivorName").text == "陆清禾", "Detail switches to recruited ID")
+	_check(detail.get_node("HeaderPanel/PortraitContainer/HalfPortrait").texture == recruited.get("portrait"), "Recruited detail portrait matches view")
 	var store := SaveStore.new(SAVE_PATH)
 	_check(store.write(app.campaign.data, app.campaign.valid_state).is_empty(), "Roster state saves through Campaign")
 	var restored := Campaign.new(catalog)
@@ -64,18 +93,23 @@ func run() -> void:
 	_check(restored.survivor_roster.get_state("SUR_004") == Roster.RECRUITED, "Recruited state survives Save/Load")
 	hud.configure_roster(catalog, restored)
 	await _frames(2)
-	_check(roster.get_node("Header/Count").text == "3/12", "Camp count survives Save/Load")
+	_check(roster.get_node("Header/Count").text == "3", "Camp count survives Save/Load")
 	_check(roster.get_survivor_view_data("SUR_004").get("is_recruited", false), "Camp reload shows recruited Survivor")
 	for survivor_id: String in ["SUR_003", "SUR_005"]:
 		_check(restored.discover_survivor(survivor_id) and restored.recruit_survivor(survivor_id), "Roster supports an additional recruitment")
 	hud.refresh_roster()
 	await _frames(2)
-	_check(roster.get_node("Header/Count").text == "5/12", "Dynamic roster supports five recruited Survivors")
+	_check(roster.get_node("Header/Count").text == "5", "Dynamic roster supports five recruited Survivors")
 	for survivor_id: String in ["SUR_006", "SUR_007", "SUR_008", "SUR_009", "SUR_010", "SUR_011", "SUR_012"]:
 		_check(restored.discover_survivor(survivor_id) and restored.recruit_survivor(survivor_id), "Roster supports full-catalog recruitment")
 	hud.refresh_roster()
 	await _frames(2)
-	_check(roster.get_node("Header/Count").text == "12/12", "Dynamic roster supports twelve recruited Survivors")
+	_check(roster.get_node("Header/Count").text == "12", "Dynamic roster supports twelve recruited Survivors")
+	_check(roster.get_global_rect().size.y == 500.0, "Roster rail caps at four visible portrait cards")
+	_check(roster.get_node("RosterContainer/OverlayScrollBar").visible, "Additional members enable the light overlay scrollbar")
+	roster.get_node("RosterContainer/OverlayScrollBar").value = 114.0
+	await _frames(2)
+	_check(roster.get_node("RosterContainer/ScrollContainer").scroll_vertical > 0, "Additional portrait cards remain scrollable")
 
 	_cleanup()
 	app.queue_free()
@@ -92,6 +126,15 @@ func _frames(count: int) -> void:
 func _check(condition: bool, message: String) -> void:
 	if not condition:
 		failures.append(message)
+
+func _capture(filename: String) -> void:
+	if DisplayServer.get_name() == "headless":
+		return
+	DirAccess.make_dir_recursive_absolute(OUTPUT)
+	await RenderingServer.frame_post_draw
+	var screenshot: Image = root.get_texture().get_image()
+	_check(screenshot.get_size() == Vector2i(1600, 900), "Camp screenshot is 1600x900")
+	_check(screenshot.save_png(OUTPUT + filename) == OK, "Camp screenshot saved")
 
 func _cleanup() -> void:
 	for suffix: String in ["", ".bak", ".tmp"]:

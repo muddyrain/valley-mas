@@ -11,6 +11,7 @@
 - 所有新增或修改 3D/2D 美术资产前必须读取 `art/ART_BIBLE.md`、`art/ASSET_PIPELINE.md` 和 `art/MODEL_CATALOG.md`；优先复用与组合现有资产，只有不存在合适资产时才创建新模型。
 
 - 原生 Godot 4.x + GDScript，Compatibility 渲染；工程入口 `project.godot`，场景装配 `core/main.gd`，行动逻辑 `missions/mission.gd`。
+- 环境操作统一标注 `[Windows]` 或 `[macOS]`：`[Windows]` 负责 Godot 主运行测试、构建与独立程序、Blender、Meshy 和 GPU 渲染；`[macOS]` 负责代码、文档、Git、Codex、UI 与逻辑修改。路径不得跨系统直接复制，具体规范见 `README.md#development-environment`。
 - 当前实现为第 32 节切片与第 33 节的局部五日版本：跨日基础见 `docs/DAY_LOOP_SPEC.md`，0.4.0 开局与成长见 `docs/NEW_RUN_SPEC.md`。新游戏先选专精、从现有角色池随机抽两人，基地可换装和食物训练；「整装出发」进入今日行动三选一，复用当前城区并配置不同物资与敌情，状态/存档契约见 `docs/TODAY_ACTION.md`。独立任务布局、通用治疗/区域支援、跨局解锁、基地房间及完整 Day Loop 仍在后续。
 - 内容真源为 `data/` 下的 Resource 与 `.tres`；地图布局、时段和威胁参数同样数据驱动。修改数据字段时联查 `data/catalog.gd`、消费模块和 `tests/rules.gd`。
 - 表现集中在 `maps/`、`vfx/`、`blue_hour/`，角色模型允许替换；战斗、导航、资源与结算不得依赖占位模型节点。
@@ -24,6 +25,22 @@
 - 专项验收包括实际 Godot Headless 规则/行动测试、原生渲染启动、鼠标命令、搜索中断与恢复、武器自由分配、昼夜转换和完整撤离循环；命令见根 `docs/PROJECT_GUIDE.md` 的蓝时归航章节。
 - 每次功能开发或修复交付前必须实际执行 Windows build，并验证导出的独立程序启动。交付 `build/BlueHourHomeward.exe` 的可点击路径，不能只提供源码、Godot 工程或构建命令；如构建失败必须明确报告失败原因。纯文档变更无需重复构建。
 - 仅修改本项目及用户授权的仓库入口文档；不得修改其他 `apps/*` 的业务实现。运行日志、截图、导出物和 `.godot/` 不纳入版本控制。
+
+## 任务交付报告
+
+- 每次项目修改任务都在项目 `docs/reports/` 新增 `YYYY-MM-DD_<feature_name>_report.md`；没有报告即视为未完成。报告包含 Task Summary、Changed Files（修改 / 新增 / 删除）、Implementation Details（原因、方式、数据流）、Validation（测试、Godot 运行、UI 截图路径与 PASS / FAIL）、Known Issues 和 Environment。
+- Environment 分别记录 Windows 与 macOS 的 Godot Editor、Blender、Node、Git；未安装、未使用或无法访问时如实标注。涉及 UI、HUD、Scene 或 Model 时提供 1600×900 截图；环境差异与未完成的跨平台验证必须写明。
+- 涉及 UI 交互时，报告写明触发入口、状态变化与关闭方式，并附截图或录屏路径；截图需覆盖可见的关键状态，动画改动还应验证中断与连续操作。
+- 修改已有系统前核对数据来源、绑定方式和当前测试结果；不得用临时 fallback 覆盖正式数据，也不得按数组索引、角色名字或文件编号绑定资源。所有 UI 图片注明来源路径、使用位置和绑定 ID；不得用截图或旧版本资源代替正式资源，也不得以旧资源作为 fallback。
+- 涉及数据绑定时，报告明确数据来源、从 ID 到 UI 的绑定链路，以及本次修改是否影响旧逻辑。
+- Survivor 系统以 `survivor_id` 为唯一索引；Portrait、Model、Trait、Profile 的来源必须追溯到 `SurvivorDefinition`，不得按名字或数组顺序匹配。
+
+## Survivor Resource Binding Rule
+
+- `survivor_id` 是唯一身份键；不得按文件名、中文名、文件夹顺序或创建顺序绑定角色资源。
+- 角色的 Model、Portrait、Animation、Data 关系由 `SurvivorDefinition` 确定。正式 Model 与 Portrait 归属 `assets/characters/<character_id>/`；头像统一为该角色目录下的 `portrait/avatar_square.png`，由 Definition 的 `portrait_path` 显式引用。公共 Locomotion 动画继续复用 `assets/animations/public_locomotion/`，不得在角色目录复制公共动作。
+- 所有 UI 只消费 Survivor 数据及 `survivor_id` 关联的 view model，不直接扫描角色或 UI 资源目录。`assets/ui/camp/survivor_avatars/` 已弃用，不得新增幸存者头像。
+- 环境结论标注 `[Windows] Windows environment required`（正式 Godot 运行、构建、独立程序、Blender / Meshy 资源处理和性能验收）或 `[macOS] macOS compatible`（代码、文档、Git、Codex 与可用的本机兼容性检查）。macOS 的 Godot 检查不能替代 Windows 发布验收。
 
 ## 文件命名卫生
 

@@ -1,6 +1,5 @@
 extends RefCounted
 const UI = preload("res://ui/ui_style.gd")
-const PORTRAITS: Dictionary = preload("res://ui/expedition/squad_card.gd").PORTRAITS
 const INK := Color("#293f49")
 const MUTED := Color("#6e7979")
 const PAPER := Color("#f1ecdf")
@@ -97,7 +96,8 @@ static func button(text: String, callback: Callable, minimum := Vector2(0, 42)) 
 
 static func portrait(spec: Resource, dimensions := Vector2(42, 48)) -> TextureRect:
 	var result := TextureRect.new()
-	result.texture = load(spec.portrait_path) if not spec.portrait_path.is_empty() else PORTRAITS.get(spec.id)
+	var portrait_path := str(spec.portrait) if spec is SurvivorDefinition else ""
+	result.texture = load(portrait_path) as Texture2D if not portrait_path.is_empty() else null
 	result.custom_minimum_size = dimensions
 	result.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	result.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED

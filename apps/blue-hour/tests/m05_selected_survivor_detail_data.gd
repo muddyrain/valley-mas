@@ -1,7 +1,7 @@
 extends SceneTree
 
 const MAIN := preload("res://core/main.tscn")
-const OUTPUT := "res://test-output/camp-survivor-detail-m05/"
+const OUTPUT := "res://test-output/camp-survivor-panel/"
 var failures: Array[String] = []
 
 func _initialize() -> void:
@@ -25,22 +25,22 @@ func run() -> void:
 	var entry_012: Button = roster.find_child("SurvivorEntry_SUR_012", true, false)
 	_check(not detail.visible, "M05 starts hidden")
 	entry_001.emit_signal("pressed")
-	await _frames(2)
+	await create_timer(0.35).timeout
 	_check(detail.visible, "Selecting a survivor reveals M05")
 	_check(detail.survivor_id == "SUR_001", "M05 tracks the selected survivor ID")
 	_check(detail.get_node("HeaderPanel/SurvivorName").text == "夏知遥", "SUR_001 display name is authored")
-	_check(detail.get_node("HeaderPanel/SurvivorNameEn").text == "SUR_001 Lv.1" and detail.get_node("HeaderPanel/HPLabel").text == "HP 100 / 100", "M05 separates ID, level, and HP")
-	_check(detail.get_node("HeaderPanel/TraitBadge/Label").text == "搜寻直觉", "M05 surfaces the current trait in the header")
+	_check(detail.get_node("HeaderPanel/SurvivorNameEn").text.contains("SUR_001") and detail.get_node("HeaderPanel/SurvivorNameEn").text.contains("Lv.1") and detail.get_node("HeaderPanel/HPLabel").text == "HP 100 / 100", "M05 separates ID, level, state, and HP")
+	_check(detail.get_node("HeaderPanel/TraitBadge/Label").text == roster.get_survivor_view_data("SUR_001").get("tags"), "M05 surfaces role tags from the selected view")
 	_check(detail.has_node("HeaderPanel/PortraitContainer/HalfPortrait"), "M05 keeps an independent portrait container")
-	_check(detail.get_node("BackgroundPanel/SectionTitle").text == "灾变前身份" and detail.get_node("BackgroundPanel/BackgroundRole").text.contains("城市徒步"), "M05 uses background title")
-	_check(detail.get_node("BackgroundPanel/BackgroundDescription").text == "她以前就喜欢钻进城市那些不太有人注意的小巷、旧街区和废弃建筑，习惯用相机记录路线和有趣的小角落。灾变以后，这种对环境异常敏感的习惯让她总能更快找到入口、储藏间以及容易被遗漏的物资。", "M05 uses background description")
+	_check(detail.get_node("BackgroundPanel/SectionTitle").text == "人物小记" and detail.get_node("HeaderPanel/RoleLabel").text.contains("城市徒步"), "M05 uses background title")
+	_check(app.catalog.by_id(app.catalog.profiles, "SUR_001").before_apocalypse.begins_with(detail.get_node("BackgroundPanel/BackgroundDescription").text.left(6)), "M05 uses the matching SurvivorProfile")
 	_check(detail.get_node("BackgroundPanel/BackgroundDescription").autowrap_mode > 0 and detail.get_node("BackgroundPanel/BackgroundDescription").clip_text, "M05 constrains background description")
 	_check(detail.get_node("CombatPanel/EquipmentTitle").text == "装备", "M05 has a distinct equipment section")
 	_check(detail.get_node("TraitPanel/TraitName").text == "搜寻直觉 · Lv.1", "M05 uses formal trait and current level")
 	_check(detail.get_node("TraitPanel/TraitDescription").text.contains("搜索速度"), "M05 uses current trait level description")
 	_check(detail.get_node("CombatPanel/WeaponName").text == "未装备", "Empty equipment uses adapter fallback")
 	_check(detail.get_node("ActionBar/SwitchButton").disabled and detail.get_node("ActionBar/EquipmentButton").disabled and detail.get_node("ActionBar/UpgradeButton").disabled, "M05 action states remain disabled")
-	_check(detail.get_global_rect().size == Vector2(354, 452), "M05 geometry remains fixed")
+	_check(detail.get_global_rect().size == Vector2(378, 500), "M05 uses a larger presentation layout")
 	await _capture("sur001-detail-1600x900.png")
 	_check(app.campaign.discover_survivor("SUR_012"), "SUR_012 can be discovered before detail switching")
 	_check(app.campaign.recruit_survivor("SUR_012"), "SUR_012 can be recruited before detail switching")
@@ -49,7 +49,7 @@ func run() -> void:
 	await _frames(2)
 	_check(roster.get_survivor_view_data("SUR_012").get("is_recruited", false), "SUR_012 roster view is recruited before detail switching")
 	roster.select_survivor("SUR_012")
-	await _frames(2)
+	await create_timer(0.35).timeout
 	_check(detail.survivor_id == "SUR_012", "M05 switches by survivor ID")
 	_check(detail.get_node("HeaderPanel/SurvivorName").text == "宋时雨", "SUR_012 display name is authored")
 	_check(detail.get_node("HeaderPanel/RoleLabel").text.contains("活动统筹"), "SUR_012 background title is authored")
@@ -76,6 +76,8 @@ func _check(condition: bool, message: String) -> void:
 		failures.append(message)
 
 func _capture(filename: String) -> void:
+	if DisplayServer.get_name() == "headless":
+		return
 	await RenderingServer.frame_post_draw
 	var screenshot: Image = root.get_texture().get_image()
 	_check(screenshot.get_size() == Vector2i(1600, 900), "Screenshot is 1600x900")

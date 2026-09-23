@@ -10,6 +10,8 @@ SUR_001～SUR_012 的 165cm 正式 Runtime、23 骨 `BH_Humanoid_Rig_v1`、canon
 
 正式入口统一为 `assets/characters/<character_id>/runtime/<character_id>.glb`；完整名册与几何数据见 [MODEL_CATALOG](MODEL_CATALOG.md)。公共库：`assets/animations/public_locomotion/public_locomotion.tres`，引用同目录 `public_idle.tres`、`public_walking.tres`、`public_running.tres`。冻结基线哈希记录在 `tests/fixtures/survivor_production_baseline.json`，SUR_003～SUR_012 的批次结果见[接入报告](../docs/REMAINING_10_SURVIVOR_RUNTIME_INTEGRATION_REPORT.md)。
 
+2026-09-23 起，12 名幸存者的正式方形头像统一放在各自 `assets/characters/<character_id>/portrait/avatar_square.png`。`data/survivors/*.tres` 的 `SurvivorDefinition.portrait_path` 显式指向该文件；Camp 与 Expedition UI 消费 Definition，不扫描目录。旧 `assets/ui/camp/survivor_avatars/` 仅保留弃用说明，迁移记录见 [任务报告](../docs/reports/2026-09-23_survivor_portrait_migration_report.md)。
+
 SUR_003～SUR_012 的可复现入口为 `art/blender/scripts/build_remaining_survivor_batch.py`。输入必须是单 Mesh、约 1.65m 的静态 A-Pose GLB；脚本对齐 canonical T-Pose、复用冻结骨架、重新蒙皮并导出正式 `source/` 与 `runtime/`。输出约束为 1 Mesh、1 Skin、23 bones、0 embedded animations、0 unweighted vertices、最多 4 influences、对象与骨架 identity transform。批处理不得修改公共 Rig、公共动作、Xia / Su 或 Gameplay。
 
 新增角色 Definition 位于 `data/survivors/`，Trait 数据位于 `data/traits/`。SUR_003～SUR_012 Trait 的 `params.runtime_status` 固定为 `data_only`；本批只登记身份、背景、五级数值和推荐武器标签，不实现 Trait Runtime。

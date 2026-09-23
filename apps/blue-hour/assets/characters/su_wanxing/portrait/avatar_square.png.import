@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://dowk6l30n7d1o"
-path="res://.godot/imported/SUR_012_Song_Shiyu_avatar.png-3e2730b6ee7834ba31c6c24fcf494ed9.ctex"
+uid="uid://d33ajdtpunqfw"
+path="res://.godot/imported/avatar_square.png-a6693b00536669704c871953e026b545.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/ui/camp/survivor_avatars/SUR_012_Song_Shiyu_avatar.png"
-dest_files=["res://.godot/imported/SUR_012_Song_Shiyu_avatar.png-3e2730b6ee7834ba31c6c24fcf494ed9.ctex"]
+source_file="res://assets/characters/su_wanxing/portrait/avatar_square.png"
+dest_files=["res://.godot/imported/avatar_square.png-a6693b00536669704c871953e026b545.ctex"]
 
 [params]
 

@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://diuj33dmpjc8i"
-path="res://.godot/imported/SUR_010_Xu_Zhaoning_avatar.png-46b7965c7bfcff7b81fd82ebf1d23907.ctex"
+uid="uid://bqbaxx15an2g5"
+path="res://.godot/imported/avatar_square.png-acffa2c65e55427242fe79931bfcc655.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/ui/camp/survivor_avatars/SUR_010_Xu_Zhaoning_avatar.png"
-dest_files=["res://.godot/imported/SUR_010_Xu_Zhaoning_avatar.png-46b7965c7bfcff7b81fd82ebf1d23907.ctex"]
+source_file="res://assets/characters/shen_yanchuan/portrait/avatar_square.png"
+dest_files=["res://.godot/imported/avatar_square.png-acffa2c65e55427242fe79931bfcc655.ctex"]
 
 [params]
 

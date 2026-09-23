@@ -13,6 +13,7 @@ description = "顾予安习惯站得稍微远一点看事情。很多人只看�
 role_tags = ["远距离输出"]
 trait_id = "calm_aim"
 model_path = "res://assets/characters/gu_yuan/runtime/gu_yuan.glb"
+portrait_path = "res://assets/characters/gu_yuan/portrait/avatar_square.png"
 max_hp = 100.0
 move_speed = 2.8
 color = Color(0.30, 0.42, 0.58, 1)

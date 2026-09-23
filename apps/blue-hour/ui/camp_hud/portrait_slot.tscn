@@ -40,9 +40,9 @@ corner_radius_bottom_left = 3
 
 [node name="PortraitSlot" type="Button"]
 script = ExtResource("2_script")
-custom_minimum_size = Vector2(94, 94)
-offset_right = 94.0
-offset_bottom = 94.0
+custom_minimum_size = Vector2(100, 110)
+offset_right = 100.0
+offset_bottom = 110.0
 mouse_default_cursor_shape = 2
 theme_override_styles/normal = SubResource("Empty")
 theme_override_styles/hover = SubResource("Empty")
@@ -51,20 +51,20 @@ theme_override_styles/focus = SubResource("Empty")
 theme_override_styles/disabled = SubResource("Empty")
 
 [node name="PortraitTexture" type="TextureRect" parent="."]
-offset_left = 8.0
-offset_top = 8.0
-offset_right = 86.0
-offset_bottom = 86.0
+offset_left = 5.0
+offset_top = 4.0
+offset_right = 95.0
+offset_bottom = 94.0
 mouse_filter = 2
 expand_mode = 1
 stretch_mode = 6
 
 [node name="Fallback" type="Panel" parent="."]
 visible = false
-offset_left = 8.0
-offset_top = 8.0
-offset_right = 86.0
-offset_bottom = 86.0
+offset_left = 5.0
+offset_top = 4.0
+offset_right = 95.0
+offset_bottom = 94.0
 mouse_filter = 2
 theme_override_styles/panel = SubResource("Fallback")
 
@@ -83,11 +83,8 @@ horizontal_alignment = 1
 vertical_alignment = 1
 
 [node name="FrameTexture" type="TextureRect" parent="."]
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
+offset_right = 100.0
+offset_bottom = 100.0
 mouse_filter = 2
 texture = ExtResource("1_frame")
 expand_mode = 1
@@ -95,17 +92,17 @@ stretch_mode = 5
 
 [node name="InfoBand" type="Panel" parent="."]
 offset_left = 4.0
-offset_top = 54.0
-offset_right = 90.0
-offset_bottom = 93.0
+offset_top = 87.0
+offset_right = 96.0
+offset_bottom = 109.0
 mouse_filter = 2
 theme_override_styles/panel = SubResource("InfoBand")
 
 [node name="NameLabel" type="Label" parent="."]
-offset_left = 7.0
-offset_top = 56.0
-offset_right = 87.0
-offset_bottom = 71.0
+offset_left = 10.0
+offset_top = 88.0
+offset_right = 75.0
+offset_bottom = 107.0
 mouse_filter = 2
 theme_override_colors/font_color = Color(0.93, 0.97, 1, 1)
 theme_override_colors/font_shadow_color = Color(0.02, 0.06, 0.10, 0.9)
@@ -114,10 +111,12 @@ theme_override_constants/shadow_offset_y = 1
 theme_override_fonts/font = SubResource("Strong")
 theme_override_font_sizes/font_size = 13
 text = ""
-horizontal_alignment = 1
+horizontal_alignment = 0
+vertical_alignment = 1
 clip_text = true
 
 [node name="EnglishLabel" type="Label" parent="."]
+visible = false
 offset_left = 7.0
 offset_top = 70.0
 offset_right = 87.0
@@ -131,19 +130,21 @@ horizontal_alignment = 1
 clip_text = true
 
 [node name="MetaLabel" type="Label" parent="."]
-offset_left = 29.0
-offset_top = 80.0
-offset_right = 87.0
-offset_bottom = 92.0
+offset_left = 72.0
+offset_top = 90.0
+offset_right = 94.0
+offset_bottom = 106.0
 mouse_filter = 2
 theme_override_colors/font_color = Color(0.84, 0.94, 0.96, 1)
 theme_override_fonts/font = SubResource("Body")
-theme_override_font_sizes/font_size = 7
+theme_override_font_sizes/font_size = 9
 text = ""
-horizontal_alignment = 1
+horizontal_alignment = 2
+vertical_alignment = 1
 clip_text = true
 
 [node name="StatusDots" type="Control" parent="."]
+visible = false
 offset_left = 12.0
 offset_top = 78.0
 offset_right = 34.0

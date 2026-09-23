@@ -13,6 +13,7 @@ description = "周野属于停不下来的人。跑、跳、搬东西、翻墙�
 role_tags = ["前排", "生存"]
 trait_id = "robust_physique"
 model_path = "res://assets/characters/zhou_ye/runtime/zhou_ye.glb"
+portrait_path = "res://assets/characters/zhou_ye/portrait/avatar_square.png"
 max_hp = 100.0
 move_speed = 2.8
 color = Color(0.82, 0.34, 0.24, 1)

@@ -13,6 +13,7 @@ description = "沈砚川喜欢弄清楚东西为什么坏掉，而不是直接�
 role_tags = ["设备", "车辆"]
 trait_id = "temporary_repair"
 model_path = "res://assets/characters/shen_yanchuan/runtime/shen_yanchuan.glb"
+portrait_path = "res://assets/characters/shen_yanchuan/portrait/avatar_square.png"
 max_hp = 100.0
 move_speed = 2.8
 color = Color(0.57, 0.48, 0.38, 1)

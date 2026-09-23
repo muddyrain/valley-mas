@@ -5,10 +5,6 @@ const HudArt = preload("res://ui/expedition/hud_skin.gd")
 const Visual = preload("res://ui/expedition/hud_visual_profile.gd")
 const HealthBar = preload("res://ui/expedition/health_bar.gd")
 signal inspected
-const PORTRAITS: Dictionary = {
-	"xia_zhiyao": preload("res://assets/ui/expedition/portraits/portrait_xia_zhiyao.png"),
-	"su_wanxing": preload("res://assets/ui/expedition/portraits/portrait_su_wanxing.png")
-}
 var summary: Label
 var details: Label
 var status: Label
@@ -37,7 +33,7 @@ func setup(member: Node3D, template_id: String) -> void:
 	portrait.custom_minimum_size = Vector2(88, 88)
 	portrait.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	portrait.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
-	portrait.texture = load(member.data.portrait_path) if not member.data.portrait_path.is_empty() else PORTRAITS.get(template_id)
+	portrait.texture = load(member.data.portrait_path) as Texture2D if not member.data.portrait_path.is_empty() else null
 	portrait.mouse_filter = MOUSE_FILTER_IGNORE
 	row.add_child(portrait)
 	var frame := HudArt.picture("hud_portrait_frame", Vector2.ZERO)

@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://bfnfaobwxqlld"
-path="res://.godot/imported/SUR_003_Lin_Jianyue_avatar.png-1fb446c3712c00cfc6e62c66f9a1c534.ctex"
+uid="uid://d1jtvmxroucem"
+path="res://.godot/imported/avatar_square.png-1322e355b0c21683510e001e2a8049b6.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/ui/camp/survivor_avatars/SUR_003_Lin_Jianyue_avatar.png"
-dest_files=["res://.godot/imported/SUR_003_Lin_Jianyue_avatar.png-1fb446c3712c00cfc6e62c66f9a1c534.ctex"]
+source_file="res://assets/characters/he_linchuan/portrait/avatar_square.png"
+dest_files=["res://.godot/imported/avatar_square.png-1322e355b0c21683510e001e2a8049b6.ctex"]
 
 [params]
 

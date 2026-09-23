@@ -13,6 +13,7 @@ description = "宋时雨习惯在混乱的时间表、人群和突发情况之�
 role_tags = ["特殊技能辅助"]
 trait_id = "composed_planning"
 model_path = "res://assets/characters/song_shiyu/runtime/song_shiyu.glb"
+portrait_path = "res://assets/characters/song_shiyu/portrait/avatar_square.png"
 max_hp = 100.0
 move_speed = 2.8
 color = Color(0.50, 0.57, 0.70, 1)

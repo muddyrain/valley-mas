@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://b8d8j8l8vha11"
-path="res://.godot/imported/SUR_011_He_Linchuan_avatar.png-5b875dad9892561217964aa8dc405211.ctex"
+uid="uid://cqs5uvqvdkkc1"
+path="res://.godot/imported/avatar_square.png-576dfcd49dbb00feb7db3e4771fcd4af.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/ui/camp/survivor_avatars/SUR_011_He_Linchuan_avatar.png"
-dest_files=["res://.godot/imported/SUR_011_He_Linchuan_avatar.png-5b875dad9892561217964aa8dc405211.ctex"]
+source_file="res://assets/characters/xu_zhaoning/portrait/avatar_square.png"
+dest_files=["res://.godot/imported/avatar_square.png-576dfcd49dbb00feb7db3e4771fcd4af.ctex"]
 
 [params]
 
