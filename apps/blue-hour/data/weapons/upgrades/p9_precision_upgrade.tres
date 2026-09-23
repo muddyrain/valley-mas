@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="WeaponUpgradeData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/weapon_upgrade_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = "P9_PRECISION_L2"
+weapon_id = "WPN_002_P9_PISTOL"
+level = 2
+name = "精准强化"
+description = "伤害 +15%，精准度 +20%。"
+upgrade_type = 0
+modifier_additions = Array[String]([])
+stat_changes = Array[Dictionary]([{"stat": "damage", "operation": "MULTIPLY", "value": 1.15}, {"stat": "accuracy", "operation": "MULTIPLY", "value": 1.2}])
+requirements = Array[Dictionary]([])
+weight = 1.0
+conflict_group = &""

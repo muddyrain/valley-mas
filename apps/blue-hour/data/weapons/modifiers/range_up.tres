@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="WeaponModifierData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/weapon_modifier_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = "RANGE_UP"
+name = "射程提升"
+description = "射程 +12%"
+category = 0
+target_stat = &"range"
+operation = 1
+value = 1.12
+rarity_weight = 1.0
+max_stack = 1
+conflict_group = &""
+weapon_tags = Array[String]([])
+effect_id = &""

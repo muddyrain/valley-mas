@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="WeaponUpgradeData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/weapon_upgrade_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = "P9_MAGAZINE_L2"
+weapon_id = "WPN_002_P9_PISTOL"
+level = 2
+name = "扩容弹匣"
+description = "弹匣容量 +40%。"
+upgrade_type = 0
+modifier_additions = Array[String]([])
+stat_changes = Array[Dictionary]([{"stat": "magazine_size", "operation": "MULTIPLY", "value": 1.4}])
+requirements = Array[Dictionary]([])
+weight = 1.0
+conflict_group = &""

@@ -5,6 +5,10 @@ const Registry = preload("res://data/weapon_registry.gd")
 const Instance = preload("res://weapons/weapon_instance.gd")
 const Combat = preload("res://weapons/weapon_combat_controller.gd")
 const Modifiers = preload("res://weapons/weapon_modifiers.gd")
+const ModifierRegistry = preload("res://data/weapon_modifier_registry.gd")
+const ModifierData = preload("res://data/weapon_modifier_data.gd")
+const RarityRegistry = preload("res://data/weapon_rarity_registry.gd")
+const RarityProfileData = preload("res://data/weapon_rarity_profile_data.gd")
 const Store = preload("res://core/save_store.gd")
 const Mission = preload("res://missions/mission.gd")
 const Ledger = preload("res://core/run_ledger.gd")
@@ -26,6 +30,52 @@ func near(actual: float, expected: float, label: String) -> void:
 func run() -> void:
 	var content := Catalog.new()
 	check(content.weapons.size() == 8 and content.validate().is_empty(), "Eight valid formal definitions")
+	check(ModifierRegistry.validate().is_empty(), "Modifier Resource registry validates")
+	check(RarityRegistry.validate().is_empty(), "Rarity profile registry validates")
+	var rarity_profiles: Array[Resource] = RarityRegistry.definitions()
+	check(rarity_profiles.size() == 5, "Five rarity profile Resources are registered")
+	var expected_rarity_slots := [[0, 0], [1, 0], [2, 0], [2, 1], [3, 1]]
+	for tier: int in range(rarity_profiles.size()):
+		var profile: RarityProfileData = rarity_profiles[tier] as RarityProfileData
+		check(profile.tier == tier, "Rarity ID tier mapping remains stable: " + profile.id)
+		check(profile.modifier_slots == expected_rarity_slots[tier][0] and profile.special_effect_slots == expected_rarity_slots[tier][1], "Rarity slots match contract: " + profile.id)
+		check(RarityRegistry._valid_color_key(profile.color_key) and profile.drop_weight == 1.0, "Rarity visual and drop weight data: " + profile.id)
+	check(RarityRegistry.by_id("SPECIAL") == RarityRegistry.by_id("EPIC"), "Legacy SPECIAL ID aliases EPIC")
+	check(RarityRegistry.by_tier(3).id == "EPIC", "Legacy tier 3 resolves to EPIC")
+	var duplicate_rarity: Resource = (RarityRegistry.by_id("COMMON") as Resource).duplicate()
+	var duplicate_rarity_resources := RarityRegistry.definitions()
+	duplicate_rarity_resources.append(duplicate_rarity)
+	check(not RarityRegistry.validate_resources(duplicate_rarity_resources).is_empty(), "Duplicate rarity IDs and tiers are rejected")
+	var mismatched_rarity: RarityProfileData = (RarityRegistry.by_id("EPIC") as RarityProfileData).duplicate()
+	mismatched_rarity.tier = 4
+	var mismatched_resources := RarityRegistry.definitions()
+	mismatched_resources[3] = mismatched_rarity
+	check(not RarityRegistry.validate_resources(mismatched_resources).is_empty(), "Rarity IDs cannot move between tiers")
+	var invalid_color_rarity: RarityProfileData = (RarityRegistry.by_id("RARE") as RarityProfileData).duplicate()
+	invalid_color_rarity.color_key = "not-a-color"
+	var invalid_color_resources := RarityRegistry.definitions()
+	invalid_color_resources[2] = invalid_color_rarity
+	check(not RarityRegistry.validate_resources(invalid_color_resources).is_empty(), "Malformed rarity colors are rejected")
+	var invalid_slots_rarity: RarityProfileData = (RarityRegistry.by_id("LEGENDARY") as RarityProfileData).duplicate()
+	invalid_slots_rarity.modifier_slots = 2
+	var invalid_slots_resources := RarityRegistry.definitions()
+	invalid_slots_resources[4] = invalid_slots_rarity
+	check(not RarityRegistry.validate_resources(invalid_slots_resources).is_empty(), "Rarity slot contract changes are rejected")
+	check(Modifiers.definitions().size() == 6, "Six legacy modifiers are Resource-backed")
+	var expected_modifiers := {
+		"DAMAGE_UP": {"stat": "damage", "factor": 1.12},
+		"ATTACK_SPEED_UP": {"stat": "attack_rate", "factor": 1.10},
+		"MAGAZINE_UP": {"stat": "magazine_size", "factor": 1.25},
+		"RELOAD_SPEED_UP": {"stat": "reload_time", "factor": 0.82},
+		"ACCURACY_UP": {"stat": "accuracy", "factor": 1.08},
+		"RANGE_UP": {"stat": "range", "factor": 1.12},
+	}
+	check(Modifiers.choices(false) == ["DAMAGE_UP", "ATTACK_SPEED_UP", "MAGAZINE_UP", "RELOAD_SPEED_UP", "ACCURACY_UP", "RANGE_UP"], "Ranged modifier order remains deterministic")
+	check(Modifiers.choices(true) == ["DAMAGE_UP", "ATTACK_SPEED_UP", "RANGE_UP"], "Melee modifier choices remain unchanged")
+	var duplicate_modifier: Resource = Modifiers.definition("DAMAGE_UP").duplicate()
+	var duplicate_resources := Modifiers.definitions()
+	duplicate_resources.append(duplicate_modifier)
+	check(not ModifierRegistry.validate_resources(duplicate_resources).is_empty(), "Duplicate modifier IDs are rejected")
 	var expected := [
 		[28, 1.6, 1.65, 0, 0, 1.0, 0.0, 1, 0, 1],
 		[18, 2.0, 14, 15, 1.5, 0.88, 0.0, 1, 0, 0],
@@ -65,12 +115,17 @@ func run() -> void:
 			var derived: Resource = game.weapon(instance.instance_id)
 			check(derived != definition and derived.rarity == quality, "Derived definition isolated")
 	var original: Resource = content.by_id(content.weapons, Registry.P9)
-	for id: String in Modifiers.RULES:
+	for modifier_resource: Resource in Modifiers.definitions():
+		var modifier := modifier_resource as ModifierData
+		var id: String = modifier.id
+		var expected_modifier: Dictionary = expected_modifiers[id]
+		check(modifier.target_stat == StringName(expected_modifier.stat), "Legacy target stat preserved: " + id)
+		check(modifier.operation == ModifierData.Operation.MULTIPLY, "Legacy operation preserved: " + id)
+		near(modifier.value, float(expected_modifier.factor), "Legacy factor preserved: " + id)
 		var instance := Instance.from_dict({"uid": id, "kind": Registry.P9, "rarity": 1, "modifiers": [id]})
 		var modified: Resource = game.gear.resource(instance.to_dict())
-		var rule: Dictionary = Modifiers.RULES[id]
-		var value: float = float(original.get(rule.stat)) * rule.factor
-		near(float(modified.get(rule.stat)), ceili(value) if rule.stat == "magazine_size" else minf(1, value) if rule.stat == "accuracy" else value, id)
+		var value: float = float(original.get(expected_modifier.stat)) * float(expected_modifier.factor)
+		near(float(modified.get(expected_modifier.stat)), ceili(value) if expected_modifier.stat == "magazine_size" else minf(1, value) if expected_modifier.stat == "accuracy" else value, id)
 	near(original.damage, 18, "Shared template never modified")
 	var a: String = game.data.members[0]
 	var b: String = game.data.members[1]

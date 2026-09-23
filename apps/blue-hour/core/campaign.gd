@@ -47,7 +47,8 @@ func new_run(seed_value: int = 0, specialization: String = "combat", fixture_tem
 		var uid := "initial:" + id
 		data.members.append(id)
 		data.roster[id] = {"template": template, "level": 1, "current_level": 1, "current_xp": 0, "total_xp": 0, "xp_to_next_level": SurvivorProgressionData.xp_required_for_level(1)}
-		weapon_inventory.add_weapon(WeaponInstanceData.from_dict({"uid": uid, "kind": catalog.start_rules.starting_weapons[template]}))
+		var definition: Resource = catalog.by_id(catalog.survivors, template)
+		weapon_inventory.add_weapon(WeaponInstanceData.from_dict({"uid": uid, "kind": definition.starting_equipment.id}))
 		data.equipment[id] = uid
 	survivor_roster.sync_members(data.members)
 	data.survivor_states = survivor_roster.to_state()

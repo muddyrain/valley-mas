@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="WeaponModifierData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/weapon_modifier_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = "ATTACK_SPEED_UP"
+name = "攻速提升"
+description = "攻击速度 +10%"
+category = 0
+target_stat = &"attack_rate"
+operation = 1
+value = 1.10
+rarity_weight = 1.0
+max_stack = 1
+conflict_group = &""
+weapon_tags = Array[String]([])
+effect_id = &""

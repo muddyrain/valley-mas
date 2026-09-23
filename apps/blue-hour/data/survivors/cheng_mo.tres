@@ -1,7 +1,8 @@
-[gd_resource type="Resource" load_steps=3 format=3]
+[gd_resource type="Resource" load_steps=4 format=3]
 
 [ext_resource type="Script" path="res://data/survivor_definition.gd" id="1"]
 [ext_resource type="Resource" path="res://data/traits/morale_boost.tres" id="2_trait"]
+[ext_resource type="Resource" path="res://data/weapons/wpn_006_a21_assault_rifle.tres" id="3_equipment"]
 
 [resource]
 script = ExtResource("1")
@@ -10,7 +11,7 @@ display_name = "程茉"
 profession_id = "community_event_planner"
 profession_name = "社区活动策划兼职"
 description = "程茉很擅长观察一个群体什么时候开始紧张、疲惫或者失去耐心。她不一定是声音最大的人，但经常能在最糟糕的时候让大家重新把注意力放回来。"
-role_tags = ["团队输出"]
+role_tags = Array[String](["support", "leader"])
 trait_id = "morale_boost"
 model_path = "res://assets/characters/cheng_mo/runtime/cheng_mo.glb"
 portrait_path = "res://assets/characters/cheng_mo/portrait/avatar_square.png"
@@ -18,5 +19,7 @@ max_hp = 100.0
 move_speed = 2.8
 color = Color(0.73, 0.53, 0.72, 1)
 survivor_id = "SUR_008"
-trait_definition = ExtResource("2_trait")
 recommended_weapon_tags = Array[String](["assault_rifle", "smg"])
+base_stats = {"survival": 60, "combat": 58, "search": 55, "mobility": 62}
+starting_trait = ExtResource("2_trait")
+starting_equipment = ExtResource("3_equipment")

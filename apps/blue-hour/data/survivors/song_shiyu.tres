@@ -1,7 +1,8 @@
-[gd_resource type="Resource" load_steps=3 format=3]
+[gd_resource type="Resource" load_steps=4 format=3]
 
 [ext_resource type="Script" path="res://data/survivor_definition.gd" id="1"]
 [ext_resource type="Resource" path="res://data/traits/composed_planning.tres" id="2_trait"]
+[ext_resource type="Resource" path="res://data/weapons/wpn_002_p9_pistol.tres" id="3_equipment"]
 
 [resource]
 script = ExtResource("1")
@@ -10,7 +11,7 @@ display_name = "宋时雨"
 profession_id = "event_coordinator"
 profession_name = "活动统筹 / 会务协调"
 description = "宋时雨习惯在混乱的时间表、人群和突发情况之间重新找到节奏。越是所有人都急的时候，她反而越冷静。"
-role_tags = ["特殊技能辅助"]
+role_tags = Array[String](["support", "leader"])
 trait_id = "composed_planning"
 model_path = "res://assets/characters/song_shiyu/runtime/song_shiyu.glb"
 portrait_path = "res://assets/characters/song_shiyu/portrait/avatar_square.png"
@@ -18,5 +19,7 @@ max_hp = 100.0
 move_speed = 2.8
 color = Color(0.50, 0.57, 0.70, 1)
 survivor_id = "SUR_012"
-trait_definition = ExtResource("2_trait")
 recommended_weapon_tags = Array[String](["pistol", "rifle"])
+base_stats = {"survival": 60, "combat": 42, "search": 68, "mobility": 58}
+starting_trait = ExtResource("2_trait")
+starting_equipment = ExtResource("3_equipment")

@@ -2,6 +2,8 @@ extends Control
 signal closed
 const UI = preload("res://ui/ui_style.gd")
 const Modifiers = preload("res://weapons/weapon_modifiers.gd")
+const RarityRegistry = preload("res://data/weapon_rarity_registry.gd")
+const RarityProfileData = preload("res://data/weapon_rarity_profile_data.gd")
 var app: Node
 var details: VBoxContainer
 var entries: Dictionary = {}
@@ -80,13 +82,14 @@ func _show_list(owned: bool) -> void:
 		_show_details(app.catalog.weapons[0])
 
 func _entry(list: VBoxContainer, definition: Resource, item: Dictionary = {}) -> void:
+	var rarity_profile: RarityProfileData = RarityRegistry.by_tier(definition.rarity)
 	var button := UI.button(definition.display_name, func(): _show_details(definition, item), Vector2(280, 60))
 	button.icon = definition.icon()
 	button.expand_icon = true
 	button.add_theme_constant_override("icon_max_width", 52)
 	button.alignment = HORIZONTAL_ALIGNMENT_LEFT
 	button.add_theme_font_size_override("font_size", 15)
-	button.add_theme_stylebox_override("normal", UI.panel(UI.PANEL, Modifiers.RARITY_COLORS[definition.rarity]))
+	button.add_theme_stylebox_override("normal", UI.panel(UI.PANEL, rarity_profile.color() if rarity_profile != null else UI.PANEL))
 	list.add_child(button)
 	entries[item.get("uid", definition.id)] = button
 
@@ -98,6 +101,7 @@ func _show_details(definition: Resource, item: Dictionary = {}) -> void:
 		child.queue_free()
 	if definition == null:
 		return
+	var rarity_profile: RarityProfileData = RarityRegistry.by_tier(definition.rarity)
 	var icon := TextureRect.new()
 	icon.name = "WeaponIcon"
 	icon.texture = definition.icon()
@@ -107,7 +111,9 @@ func _show_details(definition: Resource, item: Dictionary = {}) -> void:
 	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	details.add_child(icon)
 	details.add_child(UI.label(definition.display_name, 24))
-	details.add_child(UI.label(definition.type_name() + " · " + Modifiers.RARITY_NAMES[definition.rarity], 17, Modifiers.RARITY_COLORS[definition.rarity]))
+	var rarity_name := rarity_profile.display_name if rarity_profile != null else "未定義品质"
+	var rarity_color := rarity_profile.color() if rarity_profile != null else UI.TEXT
+	details.add_child(UI.label(definition.type_name() + " · " + rarity_name, 17, rarity_color))
 	details.add_child(UI.wrapped(definition.description, 16))
 	var stats := "伤害  %.1f%s\n攻击速度  %.2f 次/秒\n射程  %.2f m" % [definition.damage, " / 弹丸" if definition.pellet_count > 1 else "", definition.attack_rate, definition.range]
 	if not definition.melee:
@@ -118,7 +124,9 @@ func _show_details(definition: Resource, item: Dictionary = {}) -> void:
 	label.name = "WeaponStats"
 	details.add_child(label)
 	for id: String in item.get("modifiers", []):
-		details.add_child(UI.label(Modifiers.RULES[id].label, 16, UI.CYAN))
+		var modifier: Resource = Modifiers.definition(id)
+		if modifier != null:
+			details.add_child(UI.label(modifier.description, 16, UI.CYAN))
 	if not str(item.get("affix", "")).is_empty():
 		details.add_child(UI.wrapped(app.catalog.by_id(app.catalog.affixes, item.affix).description, 16, UI.CYAN))
 	if item.is_empty():

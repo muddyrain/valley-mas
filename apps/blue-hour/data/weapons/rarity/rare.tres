@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="WeaponRarityProfileData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/weapon_rarity_profile_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = "RARE"
+display_name = "稀有"
+color_key = "#78b8e2"
+tier = 2
+modifier_slots = 2
+special_effect_slots = 0
+drop_weight = 1.0
+allowed_modifier_rarity = Array[String](["COMMON", "UNCOMMON", "RARE"])

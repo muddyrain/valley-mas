@@ -1,6 +1,15 @@
 extends RefCounted
 ## Converts authored survivor definitions and the live campaign state into UI-only view data.
 
+const ROLE_LABELS: Dictionary = {
+	"explorer": "搜索效率",
+	"combat": "战斗专长",
+	"support": "特殊技能辅助",
+	"scavenger": "资源管理",
+	"medic": "医疗支援",
+	"leader": "团队领袖",
+}
+
 static func build(catalog: RefCounted, campaign: RefCounted) -> Array[Dictionary]:
 	var views: Array[Dictionary] = []
 	var roster_manager: SurvivorRosterManager = campaign.roster_manager() if campaign != null and campaign.has_method("roster_manager") else null
@@ -14,7 +23,7 @@ static func build(catalog: RefCounted, campaign: RefCounted) -> Array[Dictionary
 		var profile: Resource = catalog.by_id(catalog.profiles, survivor_id)
 		var role_tags: Array[String] = []
 		for tag: String in definition.role_tags:
-			role_tags.append(tag)
+			role_tags.append(str(ROLE_LABELS.get(tag, tag)))
 		var member_key := _member_key(campaign, roster_state, survivor_id, str(definition.id))
 		var member_state: Dictionary = roster_state.get(member_key, {}) if not member_key.is_empty() else {}
 		var is_party_member := member_key in party_ids or survivor_id in party_ids or str(definition.id) in party_ids
@@ -67,7 +76,7 @@ static func _member_key(campaign: RefCounted, roster_state: Dictionary, survivor
 static func _detail_data(definition: Resource, profile: Resource, portrait: Texture2D, current_hp: float, max_hp: float, level: int, campaign: RefCounted, member_key: String) -> Dictionary:
 	var role_tags: Array[String] = []
 	for tag: String in definition.role_tags:
-		role_tags.append(tag)
+		role_tags.append(str(ROLE_LABELS.get(tag, tag)))
 	var attribute_base := clampi(int(round(current_hp / maxf(max_hp, 1.0) * 24.0)), 1, 24)
 	var trait_data: Resource = definition.trait_definition
 	var trait_level := 1

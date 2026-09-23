@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="WeaponModifierData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/weapon_modifier_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = "RELOAD_SPEED_UP"
+name = "快速换弹"
+description = "换弹时间 −18%"
+category = 0
+target_stat = &"reload_time"
+operation = 1
+value = 0.82
+rarity_weight = 1.0
+max_stack = 1
+conflict_group = &""
+weapon_tags = Array[String]([])
+effect_id = &""

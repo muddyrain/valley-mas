@@ -4,6 +4,5 @@
 script = ExtResource("1")
 starting_count = 2
 starter_pool = Array[String](["xia_zhiyao", "su_wanxing"])
-starting_weapons = {"cheng_mo": "WPN_006_A21_ASSAULT_RIFLE", "gu_yuan": "WPN_007_H7_HUNTER_RIFLE", "he_linchuan": "WPN_006_A21_ASSAULT_RIFLE", "lin_jianyue": "WPN_005_S12_SHOTGUN", "lu_qinghe": "WPN_002_P9_PISTOL", "shen_yanchuan": "WPN_006_A21_ASSAULT_RIFLE", "song_shiyu": "WPN_002_P9_PISTOL", "su_wanxing": "WPN_001_SURVIVAL_KNIFE", "tang_zhi": "WPN_004_K9_SMG", "xia_zhiyao": "WPN_002_P9_PISTOL", "xu_zhaoning": "WPN_002_P9_PISTOL", "zhou_ye": "WPN_005_S12_SHOTGUN"}
 training_costs = Array[int]([1, 2, 3, 4])
 affix_value_bonus = 4

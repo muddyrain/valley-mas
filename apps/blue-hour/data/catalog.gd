@@ -99,10 +99,26 @@ func validate() -> Array[String]:
 		if by_id(traits, survivor.trait_id) == null or survivor.max_hp <= 0 or survivor.move_speed <= 0:
 			errors.append("Invalid survivor: " + survivor.id)
 		if survivor is SurvivorDefinition:
-			if survivor.survivor_id.is_empty() or survivor.trait_definition != by_id(traits, survivor.trait_id):
+			if survivor.survivor_id.is_empty() or survivor.starting_trait != by_id(traits, survivor.trait_id):
 				errors.append("Survivor definition/trait mismatch: " + survivor.id)
 			elif by_id(profiles, survivor.survivor_id) == null:
 				errors.append("Survivor definition/profile mismatch: " + survivor.id)
+			var role_tags: Array[String] = ["explorer", "combat", "support", "scavenger", "medic", "leader"]
+			if survivor.display_name.is_empty() or survivor.portrait_path.is_empty() or not ResourceLoader.exists(survivor.portrait_path):
+				errors.append("Survivor definition has no valid name or portrait: " + survivor.survivor_id)
+			if survivor.model_reference.is_empty() or survivor.base_stats.size() != 4:
+				errors.append("Survivor definition has incomplete static data: " + survivor.survivor_id)
+			for tag: String in survivor.role_tags:
+				if tag not in role_tags:
+					errors.append("Invalid survivor role tag: " + survivor.survivor_id + ": " + tag)
+			for stat: String in ["survival", "combat", "search", "mobility"]:
+				var value: Variant = survivor.base_stats.get(stat)
+				if not value is int and not value is float:
+					errors.append("Invalid survivor base stat: " + survivor.survivor_id + ": " + stat)
+				elif float(value) < 1.0 or float(value) > 100.0:
+					errors.append("Invalid survivor base stat: " + survivor.survivor_id + ": " + stat)
+			if survivor.starting_trait == null or survivor.starting_equipment == null or by_id(weapons, survivor.starting_equipment.id) != survivor.starting_equipment:
+				errors.append("Invalid survivor starting reference: " + survivor.survivor_id)
 	for profile: Resource in profiles:
 		if not profile is SurvivorProfile:
 			errors.append("Invalid survivor profile resource: " + profile.resource_path)
@@ -190,7 +206,7 @@ func validate() -> Array[String]:
 		errors.append("Invalid starter count")
 	var starters: Array = []
 	for id in start_rules.starter_pool:
-		if id in starters or by_id(survivors, id) == null or by_id(weapons, str(start_rules.starting_weapons.get(id, ""))) == null:
+		if id in starters or by_id(survivors, id) == null:
 			errors.append("Invalid starter pool")
 		starters.append(id)
 	for cost in start_rules.training_costs:

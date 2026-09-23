@@ -1,8 +1,9 @@
-[gd_resource type="Resource" load_steps=3 format=3]
+[gd_resource type="Resource" load_steps=4 format=3]
 
 [ext_resource type="Script" path="res://data/survivor_definition.gd" id="1"]
 
 [ext_resource type="Resource" path="res://data/traits/search_instinct.tres" id="2_trait"]
+[ext_resource type="Resource" path="res://data/weapons/wpn_002_p9_pistol.tres" id="3_equipment"]
 
 [resource]
 script = ExtResource("1")
@@ -11,7 +12,7 @@ display_name = "夏知遥"
 profession_id = "urban_scout"
 profession_name = "城市徒步 / 摄影爱好者"
 description = "她以前就喜欢钻进城市那些不太有人注意的小巷、旧街区和废弃建筑，习惯用相机记录路线和有趣的小角落。灾变以后，这种对环境异常敏感的习惯让她总能更快找到入口、储藏间以及容易被遗漏的物资。"
-role_tags = ["搜索效率"]
+role_tags = Array[String](["explorer", "scavenger"])
 trait_id = "search_instinct"
 model_path = "res://assets/characters/xia_zhiyao/runtime/xia_zhiyao.glb"
 portrait_path = "res://assets/characters/xia_zhiyao/portrait/avatar_square.png"
@@ -20,5 +21,7 @@ move_speed = 2.8
 color = Color(0.4, 0.7, 0.9, 1)
 
 survivor_id = "SUR_001"
-trait_definition = ExtResource("2_trait")
 recommended_weapon_tags = Array[String](["smg", "pistol", "light_rifle"])
+base_stats = {"survival": 55, "combat": 45, "search": 95, "mobility": 75}
+starting_trait = ExtResource("2_trait")
+starting_equipment = ExtResource("3_equipment")
