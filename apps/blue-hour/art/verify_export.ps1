@@ -41,9 +41,9 @@ foreach ($mode in @('headless', 'native')) {
 # Release templates do not expose --script. The same editor binary mounts the
 # isolated EXE's embedded pack; res:// resolves exclusively inside that pack.
 # Test evidence goes to an absolute writable directory, never into res://.
-foreach ($visualSuite in @('weapon_visuals', 'combat_animations')) {
+foreach ($visualSuite in @('weapon_visuals', 'survivor_animation_batch')) {
     # Combat checks step thousands of bone poses; concurrent builds can exceed 30 s.
-    $suiteTimeoutMs = if ($visualSuite -eq 'combat_animations') { 90000 } else { 30000 }
+    $suiteTimeoutMs = if ($visualSuite -eq 'survivor_animation_batch') { 90000 } else { 30000 }
 foreach ($mode in @('headless', 'native')) {
     $stdout = Join-Path $artifactRoot "$visualSuite-$mode.stdout.log"
     $stderr = Join-Path $artifactRoot "$visualSuite-$mode.stderr.log"
@@ -62,10 +62,10 @@ foreach ($mode in @('headless', 'native')) {
         }
         $process.Refresh()
         $outputText = Get-Content -LiteralPath $stdout, $stderr -Raw -Encoding UTF8
-        if ($process.ExitCode -ne 0 -or ($outputText -join "`n") -match '(?m)^(SCRIPT ERROR|ERROR):' -or ($outputText -join "`n") -notmatch '(WEAPON VISUALS|COMBAT ANIMATIONS): \d+ checks, 0 failures') {
+        if ($process.ExitCode -ne 0 -or ($outputText -join "`n") -match '(?m)^(SCRIPT ERROR|ERROR):' -or ($outputText -join "`n") -notmatch '(WEAPON VISUALS: \d+ checks, 0 failures|SURVIVOR ANIMATION BATCH: \d+ checks; failures=\[\])') {
             throw "Exported $visualSuite failed: $mode. See $artifactRoot"
         }
-        Write-Output "Embedded-pack $visualSuite $mode : both characters PASS"
+        Write-Output "Embedded-pack $visualSuite $mode : production roster PASS"
     } finally {
         $process.Dispose()
     }

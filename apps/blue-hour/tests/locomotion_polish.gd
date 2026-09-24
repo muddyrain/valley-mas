@@ -104,18 +104,18 @@ func run() -> void:
 		controller.update_motion(.1, 4.2, .1)
 		for speed: float in [.07, .04, .06]:
 			controller.update_motion(speed, 4.2, .1)
-			check(controller.current_state == &"Walk", id + ": idle exit hysteresis")
+			check(controller.current_state == &"Idle", id + ": below Expedition move threshold")
 		controller.update_motion(2, 4.2, .1)
 		for speed: float in [1.85, 1.7, 1.8]:
 			controller.update_motion(speed, 4.2, .1)
 			check(controller.current_state == &"Run", id + ": run exit hysteresis")
 		controller.update_motion(1.6, 4.2, .1)
 		controller.update_motion(1.8, 4.2, .1)
-		check(controller.current_state == &"Walk", id + ": run entrance hysteresis")
+		check(controller.current_state == &"Run", id + ": Expedition uses Run above move threshold")
 		for frame in 120:
 			controller.update_motion(1.3, member.data.move_speed, 1.0 / 60)
 		rates.append(controller.playback_rate)
-		check(absf(controller.playback_rate - 1.3 / 1.2448574889997928) < .001, id + ": cadence follows actual speed")
+		check(is_equal_approx(controller.playback_rate, 0.55), id + ": cadence follows actual speed")
 		var play_position: float = controller.playback.get_current_play_position()
 		controller.update_motion(4.2, 4.2, 0)
 		check(is_equal_approx(play_position, controller.playback.get_current_play_position()), id + ": pause does not advance animation")

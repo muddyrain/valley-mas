@@ -70,7 +70,7 @@ func run() -> void:
 			for frame: int in 24:
 				c.update_motion(speed, 2.8, 1.0 / 60)
 				await process_frame
-			var expedition_candidate: bool = actor.data.survivor_id == "SUR_001"
+			var expedition_candidate: bool = actor.data is SurvivorDefinition
 			var expected: StringName = &"Idle" if speed == 0.0 else &"Run" if expedition_candidate else &"Walk" if speed < 1.85 else &"Run"
 			var animation_node: StringName = StringName(String(expected).to_upper()) if expedition_candidate else expected
 			check(c.current_state == expected and c.playback.get_current_node() == animation_node, id + " state " + expected)

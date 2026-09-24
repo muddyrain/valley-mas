@@ -78,7 +78,7 @@ func setup(spec: Resource, trait_data: Resource, equipment: Resource, equipment_
 		# Imported humans face +Z; existing movement and weapon mounts face -Z.
 		# Keep navigation/weapon facing unchanged and correct only the mesh frame.
 		model.rotation.y = PI
-		animation_controller = ExpeditionAnimationController.new() if data.survivor_id == "SUR_001" else AnimationController.new()
+		animation_controller = ExpeditionAnimationController.new() if data is SurvivorDefinition else AnimationController.new()
 		model.add_child(animation_controller)
 		if not animation_controller.initialize(model):
 			animation_controller.queue_free()

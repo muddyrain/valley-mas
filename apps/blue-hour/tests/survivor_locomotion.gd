@@ -32,7 +32,7 @@ func run() -> void:
 		member.setup(load("res://data/survivors/" + id + ".tres"), catalog.traits[0], catalog.weapons[3])
 		var controller: Node3D = member.animation_controller
 		check(controller != null, id + ": game uses shared controller")
-		check(is_equal_approx(controller.visual_scale, 1), id + ": original metre scale restored")
+		check(controller.target.scale.is_equal_approx(Vector3.ONE), id + ": original metre scale restored")
 		member.searching = true
 		var dt := 1.0 / 60
 		for speed: float in [0.0, 1.3, 4.2, 1.3, 0.0]:
@@ -45,7 +45,7 @@ func run() -> void:
 			for frame in 60:
 				member.tick(dt, context)
 				await process_frame
-			var expected: StringName = &"Idle" if speed == 0 else (&"Walk" if speed < 2 else &"Run")
+			var expected: StringName = &"IDLE" if speed == 0 else &"RUN"
 			check(controller.playback.get_current_node() == expected, id + ": actual movement selects " + expected)
 			check(absf(member.position.distance_to(start) - speed) < .001, id + ": animation does not change movement speed")
 			check(absf(member.rig.position.y) < .00001 and member.rig.scale.is_equal_approx(Vector3.ONE), id + ": no whole-model bob or scale bounce")

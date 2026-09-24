@@ -31,7 +31,7 @@ func run() -> void:
 		for i: int in 30:
 			c.update_motion(2.8, 2.8, 1.0 / 60)
 			await process_frame
-		check(c.current_state == &"Run" and absf(c.playback_rate - 1.230103) < .00001, "Pack public Run playback: " + id)
+		check(c.current_state == &"Run" and is_equal_approx(c.playback_rate, 1.0), "Pack Expedition Run playback: " + id)
 		actor.queue_free()
 		await process_frame
 	print("SURVIVOR PRODUCTION PACK: ", checks, " checks; ", failures)

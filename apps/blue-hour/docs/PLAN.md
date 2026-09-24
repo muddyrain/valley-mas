@@ -1557,6 +1557,14 @@ M03: TECHNICALLY COMPLETE；Town Structure: FROZEN。停止于人工视觉审核
 
 修改、数据范围与画面证据见 [Phase 2.1 Run / Death 报告](reports/2026-09-24_survivor_animation_run_death_phase_2_1_report.md)。
 
+## 2026-09-24：Survivor Animation Phase 3 批量复用
+
+- [x] `SUR_002`～`SUR_012` 通过各自 `SurvivorDefinition` 的正式模型入口复用已验收的 Expedition 控制器与同一 11 段 AnimationLibrary；`SUR_001` 接线与动画资源不变。12 人冻结的 23 骨层级和 Rest Pose 一致，无需角色级 retarget 或 attachment offset。
+- [x] 批量专项逐人验证 11 段播放、Run、Rifle Idle/Run/Shoot、Knife Idle/Attack、Hit/Death、接地与 K9 握持；Windows Godot headless **1408 checks / 0 failures**，后台隐藏原生渲染 **1417 checks / 0 failures**，生成九张 1600×900 角色对比图。
+- [x] Survivor Animation Pipeline、正式 Expedition 动画、Expedition E00、战斗 Mission、公共 Locomotion、武器视觉等定向回归通过；Windows headless 导出、隔离 EXE 的菜单与 Expedition 四种启动模式、内嵌包角色专项均通过。
+- [x] **Survivor Animation V1 batch integration PASS**：11 名新增角色均可加载并播放共享动画，未改动画烘焙、Rig、武器数值、Gameplay、UI、地图或敌人系统，也未开始 ENM_001。
+- [ ] 全量 `run.ps1 -Mode test` 在非动画的 `camp_departure.gd` Headless UI 输入目标检查失败；不将全仓测试写成通过，详见 [Phase 3 报告](reports/2026-09-24_survivor_animation_phase_3_batch_reuse_report.md)。
+
 ## 2026-09-23：Weapon RarityProfile Resource 化 Phase W2-2
 
 - [x] 新增 Common / Uncommon / Rare / Epic / Legendary 五个 `WeaponRarityProfileData` Resource 与 `WeaponRarityRegistry`；注册表校验唯一 ID/tier、tier 对应、颜色格式和冻结槽位合同。

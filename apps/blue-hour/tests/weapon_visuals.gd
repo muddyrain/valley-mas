@@ -88,7 +88,7 @@ func run() -> void:
 			continue
 		for clip in [&"Idle", &"Walk", &"Run"]:
 			for actor in actors:
-				if actor.data.survivor_id == "SUR_001" and definition.animation_profile == WeaponDefinition.WeaponType.LONG_GUN:
+				if actor.data is SurvivorDefinition and definition.animation_profile == WeaponDefinition.WeaponType.LONG_GUN:
 					actor.animation_controller.combat_bridge.set_gameplay_state(true, false, Vector3.ZERO, actor.position)
 					actor.animation_controller.update_motion(0.0 if clip == &"Idle" else 1.0 if clip == &"Walk" else 2.8, actor.data.move_speed, .2)
 				else:
@@ -96,7 +96,7 @@ func run() -> void:
 					actor.animation_controller.advance_preview(.2)
 			for frame in 18:
 				for actor in actors:
-					if actor.data.survivor_id == "SUR_001" and definition.animation_profile == WeaponDefinition.WeaponType.LONG_GUN:
+					if actor.data is SurvivorDefinition and definition.animation_profile == WeaponDefinition.WeaponType.LONG_GUN:
 						actor.animation_controller.update_motion(0.0 if clip == &"Idle" else 1.0 if clip == &"Walk" else 2.8, actor.data.move_speed, .08)
 					else:
 						actor.animation_controller.advance_preview(.08)

@@ -216,10 +216,10 @@ func run() -> void:
 		controller.update_motion(0.0, 2.8, 1.0 / 60.0)
 		check(controller.current_state == &"Idle", id + " Idle state")
 		controller.update_motion(1.2, 2.8, 1.0 / 60.0)
-		check(controller.current_state == &"Walk", id + " Walk state")
+		check(controller.current_state == &"Run", id + " Expedition Run state at low speed")
 		controller.update_motion(2.8, 2.8, 1.0 / 60.0)
 		check(controller.current_state == &"Run", id + " Run state")
-		check(absf(controller.playback_rate - 2.8 / float(PUBLIC.get_animation(&"public_running").get_meta("nominal_speed"))) < 0.00001, id + " playback multiplier")
+		check(is_equal_approx(controller.playback_rate, 1.0), id + " Expedition Run playback multiplier")
 		controller.update_motion(0.0, 2.8, 1.0 / 60.0)
 		check(controller.current_state == &"Idle", id + " Run to Stop to Idle")
 		check(actor.selection_ring != null, id + " selection ring")
@@ -233,7 +233,7 @@ func run() -> void:
 			"trait": definition.trait_id,
 			"bones": controller.target.get_bone_count(),
 			"movement_speed": definition.base_move_speed,
-			"run_playback": 2.8 / float(PUBLIC.get_animation(&"public_running").get_meta("nominal_speed")),
+			"run_playback": controller.playback_rate,
 			"weapon_socket": str(actor.weapon_visual.socket.bone_name),
 		})
 		actor.queue_free()
