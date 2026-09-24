@@ -37,8 +37,10 @@ func check(value: bool, label: String) -> void:
 func run() -> void:
 	DirAccess.make_dir_recursive_absolute("res://test-output/combat-animation")
 	var catalog := Catalog.new()
-	catalog.survivors = [load("res://data/survivors/xia_zhiyao.tres"), load("res://data/survivors/su_wanxing.tres")]
-	var equipment: Array[String] = [Registry.A21, Registry.A21]
+	# Preserve the original Public/Combat graph contract on the unaffected actor;
+	# Xia's formal Expedition path has a dedicated Survivor animation test.
+	catalog.survivors = [load("res://data/survivors/su_wanxing.tres")]
+	var equipment: Array[String] = [Registry.A21]
 	mission = Mission.new()
 	root.add_child(mission)
 	mission.setup(catalog, Ledger.new(), equipment, 7312)

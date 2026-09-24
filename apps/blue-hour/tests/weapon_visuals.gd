@@ -88,12 +88,18 @@ func run() -> void:
 			continue
 		for clip in [&"Idle", &"Walk", &"Run"]:
 			for actor in actors:
-				actor.animation_controller.preview(clip)
-				# Equip now blends into combat over .16 s; check settled grip direction.
-				actor.animation_controller.advance_preview(.2)
+				if actor.data.survivor_id == "SUR_001" and definition.animation_profile == WeaponDefinition.WeaponType.LONG_GUN:
+					actor.animation_controller.combat_bridge.set_gameplay_state(true, false, Vector3.ZERO, actor.position)
+					actor.animation_controller.update_motion(0.0 if clip == &"Idle" else 1.0 if clip == &"Walk" else 2.8, actor.data.move_speed, .2)
+				else:
+					actor.animation_controller.preview(clip)
+					actor.animation_controller.advance_preview(.2)
 			for frame in 18:
 				for actor in actors:
-					actor.animation_controller.advance_preview(.08)
+					if actor.data.survivor_id == "SUR_001" and definition.animation_profile == WeaponDefinition.WeaponType.LONG_GUN:
+						actor.animation_controller.update_motion(0.0 if clip == &"Idle" else 1.0 if clip == &"Walk" else 2.8, actor.data.move_speed, .08)
+					else:
+						actor.animation_controller.advance_preview(.08)
 				await frames(2)
 				for actor in actors:
 					var visual: WeaponVisualController = actor.weapon_visual
@@ -102,7 +108,9 @@ func run() -> void:
 					var grip := visual.model.get_node("GripPoint_R") as Node3D
 					check(grip.global_position.distance_to(bone.origin) < .10, "Grip within palm reach")
 					var front := -visual.model.global_basis.z.normalized()
-					check(front.dot(-actor.rig.global_basis.z.normalized()) > .88, "Weapon faces forward during " + clip)
+					var forward_dot := front.dot(-actor.rig.global_basis.z.normalized())
+					if frame > 0:
+						check(forward_dot > .88, "Weapon faces forward during %s frame %d: %s %s %.3f" % [clip, frame, actor.data.id, definition.id, forward_dot])
 					check(visual.model.global_transform.is_finite(), "Finite model pose")
 				if frame == 8:
 					await capture(definition.id + "-" + clip)

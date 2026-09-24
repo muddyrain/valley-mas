@@ -25,7 +25,8 @@ func run() -> void:
 	var context := MotionContext.new()
 	root.add_child(context)
 	context.manual_aim = false
-	for id: String in ["xia_zhiyao", "su_wanxing"]:
+	# Xia's Expedition locomotion is exercised through the formal Mission test.
+	for id: String in ["su_wanxing"]:
 		var member := Survivor.new()
 		root.add_child(member)
 		member.setup(load("res://data/survivors/" + id + ".tres"), catalog.traits[0], catalog.weapons[3])
@@ -58,6 +59,7 @@ func run() -> void:
 	context.queue_free()
 	await process_frame
 	var report := {"checks": checks, "failures": failures}
+	DirAccess.make_dir_recursive_absolute("res://test-output/locomotion")
 	FileAccess.open("res://test-output/locomotion/survivor-validation.json", FileAccess.WRITE).store_string(JSON.stringify(report, "\t"))
 	print("SURVIVOR LOCOMOTION: ", report)
 	quit(0 if failures.is_empty() else 1)

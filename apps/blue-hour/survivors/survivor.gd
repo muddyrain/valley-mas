@@ -7,6 +7,7 @@ var combat := Combat.new()
 var weapon_visual: WeaponVisualController
 const Modifiers = preload("res://core/effect_modifiers.gd")
 const AnimationController = preload("res://survivors/survivor_animation_controller.gd")
+const ExpeditionAnimationController = preload("res://survivors/survivor_expedition_animation_controller.gd")
 const CombatVFX = preload("res://weapons/combat/vfx/combat_vfx_resolver.gd")
 const TraitRuntime = preload("res://core/trait_runtime.gd")
 const ACCELERATION: float = 10.0
@@ -77,7 +78,7 @@ func setup(spec: Resource, trait_data: Resource, equipment: Resource, equipment_
 		# Imported humans face +Z; existing movement and weapon mounts face -Z.
 		# Keep navigation/weapon facing unchanged and correct only the mesh frame.
 		model.rotation.y = PI
-		animation_controller = AnimationController.new()
+		animation_controller = ExpeditionAnimationController.new() if data.survivor_id == "SUR_001" else AnimationController.new()
 		model.add_child(animation_controller)
 		if not animation_controller.initialize(model):
 			animation_controller.queue_free()
@@ -285,6 +286,8 @@ func take_damage(amount: float, invincible: bool = false, damage_tags: Array[Str
 		aura_multiplier = float(_motion_mission.incoming_damage_multiplier(self, damage_tags))
 	hp = maxf(0, hp - effects.incoming_damage(amount * talent.incoming_damage_multiplier * aura_multiplier))
 	damaged.emit()
+	if animation_controller != null and animation_controller.has_method("on_damage"):
+		animation_controller.on_damage(hp <= 0.0)
 	if hp <= 0:
 		dead = true
 		searching = false
@@ -292,8 +295,9 @@ func take_damage(amount: float, invincible: bool = false, damage_tags: Array[Str
 		duty_label.text = ""
 		duty_ring.visible = false
 		path.clear()
-		rig.rotation.z = PI * 0.5
-		rig.position.y = -0.5
+		if animation_controller == null or not animation_controller.has_method("on_damage"):
+			rig.rotation.z = PI * 0.5
+			rig.position.y = -0.5
 		hp_bar.visible = false
 
 

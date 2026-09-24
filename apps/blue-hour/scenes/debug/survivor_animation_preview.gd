@@ -5,6 +5,7 @@ const CHARACTER_NAME: StringName = &"XiaZhiyao"
 const RIGHT_HAND: StringName = &"RightHand"
 const WEAPON_SCENE: PackedScene = preload("res://assets/generated/weapon_submachine_gun_model.glb")
 const LONG_GUN_PROFILE: WeaponPoseProfile = preload("res://data/weapon_poses/long_gun.tres")
+const PREVIEW_WEAPON_SCALE: float = 0.84
 
 func _ready() -> void:
 	call_deferred("_attach_preview_weapon")
@@ -38,6 +39,7 @@ func _attach_preview_weapon() -> void:
 	else:
 		attachment.add_child(weapon_root)
 	weapon_root.transform = LONG_GUN_PROFILE.attachment_transform() * grip_transform.affine_inverse()
+	weapon_root.scale = Vector3.ONE * PREVIEW_WEAPON_SCALE
 
 func _find_skeleton(node: Node) -> Skeleton3D:
 	if node is Skeleton3D:

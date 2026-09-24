@@ -2,11 +2,18 @@ import bpy
 import math
 import os
 import sys
+import tempfile
 from mathutils import Matrix, Quaternion, Vector
+
+sys.path.insert(0, os.path.dirname(__file__))
+from merge_survivor_animation_channels import merge_clip_channels
 
 
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
-SOURCE_ROOT = r"C:\Users\A\Downloads\幸存者动作"
+SOURCE_ROOT = os.environ.get(
+	"BH_ANIMATION_SOURCE_ROOT",
+	os.path.join(PROJECT_ROOT, "assets", "characters", "survivors", "animations", "source"),
+)
 RIG_PATH = os.path.join(PROJECT_ROOT, "art", "blender", "rigs", "BH_Humanoid_Rig_v1.blend")
 
 CLIPS = {
@@ -54,21 +61,124 @@ POSE_CORRECTIONS = {
 		"RightUpperArm": [((0.0, 1.0, 0.0), -52.0)],
 	},
 	"rifle_idle": {
-		"LeftUpperArm": [((0.0, 1.0, 0.0), -35.0), ((0.0, 0.0, 1.0), -42.0)],
-		"RightUpperArm": [((0.0, 1.0, 0.0), 35.0), ((0.0, 0.0, 1.0), 42.0)],
-		"LeftLowerArm": [((0.0, 0.0, 1.0), -40.0)],
-		"RightLowerArm": [((0.0, 0.0, 1.0), 40.0)],
-		"LeftHand": [((0.0, 0.0, 1.0), -4.0)],
-		"RightHand": [((0.0, 0.0, 1.0), 4.0)],
 	},
 	"rifle_run": {
-		"LeftUpperArm": [((0.0, 1.0, 0.0), 34.0)],
-		"RightUpperArm": [((0.0, 1.0, 0.0), -34.0)],
-		"LeftLowerArm": [((0.0, 0.0, 1.0), -26.0)],
-		"RightLowerArm": [((0.0, 0.0, 1.0), 26.0)],
-		"RightHand": [((1.0, 0.0, 0.0), 90.0)],
 	},
 }
+
+
+RIFLE_HAND_BASIS = Matrix((
+	(-1.0, 0.0, 0.0),
+	(0.0, -0.8, -0.6),
+	(0.0, -0.6, 0.8),
+))
+RIFLE_FORWARD = Matrix.Rotation(math.pi, 3, "Z")
+RIFLE_PREVIEW_SCALE = 0.84
+
+
+def point_bone(canonical: bpy.types.Object, bone_name: str, direction: Vector) -> None:
+	pose_bone = canonical.pose.bones[bone_name]
+	current = pose_bone.matrix.copy()
+	rotation = (current.to_3x3() @ Vector((0.0, 1.0, 0.0))).rotation_difference(direction.normalized())
+	pose_bone.matrix = Matrix.LocRotScale(current.translation, rotation @ current.to_quaternion(), current.to_scale())
+	bpy.context.view_layer.update()
+
+
+def solve_arm(canonical: bpy.types.Object, side: str, wrist: Vector, pole: Vector) -> None:
+	upper = canonical.pose.bones[f"{side}UpperArm"]
+	lower = canonical.pose.bones[f"{side}LowerArm"]
+	start = upper.head.copy()
+	reach = wrist - start
+	distance = min(reach.length, upper.bone.length + lower.bone.length - 0.001)
+	axis = reach.normalized()
+	upper_length = upper.bone.length
+	lower_length = lower.bone.length
+	along = (upper_length * upper_length - lower_length * lower_length + distance * distance) / (2.0 * distance)
+	height = math.sqrt(max(0.0, upper_length * upper_length - along * along))
+	bend = pole - axis * pole.dot(axis)
+	bend.normalize()
+	elbow = start + axis * along + bend * height
+	point_bone(canonical, upper.name, elbow - start)
+	point_bone(canonical, lower.name, wrist - lower.head)
+
+
+def solve_run_arms(canonical: bpy.types.Object, source: bpy.types.Object) -> None:
+	# Mixamo's jogging wrists stay below the shoulders; the generic rest-pose delta lifts them above the head.
+	source_basis = source.matrix_world.to_3x3()
+	target_basis = canonical.matrix_world.inverted().to_3x3()
+	for side in ("Left", "Right"):
+		source_upper = source.pose.bones[f"mixamorig:{side}Arm"]
+		source_lower = source.pose.bones[f"mixamorig:{side}ForeArm"]
+		source_hand = source.pose.bones[f"mixamorig:{side}Hand"]
+		target_upper = canonical.pose.bones[f"{side}UpperArm"]
+		target_lower = canonical.pose.bones[f"{side}LowerArm"]
+		source_reach = (source_upper.bone.length + source_lower.bone.length) * source.matrix_world.to_scale().x
+		target_reach = (target_upper.bone.length + target_lower.bone.length) * canonical.matrix_world.to_scale().x
+		scale = target_reach / source_reach
+		wrist_delta = target_basis @ (source_basis @ (source_hand.head - source_upper.head)) * scale
+		elbow_delta = target_basis @ (source_basis @ (source_lower.head - source_upper.head))
+		solve_arm(canonical, side, target_upper.head + wrist_delta, elbow_delta)
+
+
+def settle_death_legs(canonical: bpy.types.Object, progress: float) -> None:
+	# The source Death ends with a wide split; converge the ankles only after the body has landed.
+	weight = max(0.0, min(1.0, (progress - 0.7) / 0.2))
+	if weight <= 0.0:
+		return
+	weight = weight * weight * (3.0 - 2.0 * weight)
+	hip = canonical.pose.bones["Hips"].head
+	for side, offset in (
+		("Left", Vector((0.18, -0.60, -0.03))),
+		("Right", Vector((-0.13, -0.55, -0.03))),
+	):
+		upper = canonical.pose.bones[f"{side}UpperLeg"]
+		lower = canonical.pose.bones[f"{side}LowerLeg"]
+		foot = canonical.pose.bones[f"{side}Foot"]
+		foot_rotation = foot.matrix.to_quaternion()
+		ankle = foot.head.lerp(hip + offset, weight)
+		start = upper.head.copy()
+		reach = ankle - start
+		distance = min(reach.length, upper.bone.length + lower.bone.length - 0.001)
+		axis = reach.normalized()
+		along = (upper.bone.length ** 2 - lower.bone.length ** 2 + distance ** 2) / (2.0 * distance)
+		height = math.sqrt(max(0.0, upper.bone.length ** 2 - along ** 2))
+		pole = lower.head - start
+		bend = pole - axis * pole.dot(axis)
+		bend.normalize()
+		knee = start + axis * along + bend * height
+		point_bone(canonical, upper.name, knee - start)
+		point_bone(canonical, lower.name, ankle - lower.head)
+		foot.matrix = Matrix.LocRotScale(foot.head, foot_rotation, Vector((1.0, 1.0, 1.0)))
+		bpy.context.view_layer.update()
+
+
+def solve_rifle_pose(canonical: bpy.types.Object) -> None:
+	# The weapon follows RightHand; the carry follows shoulder motion and chest heading.
+	chest = canonical.pose.bones["UpperChest"]
+	chest_delta = chest.matrix @ chest.bone.matrix_local.inverted()
+	heading = Quaternion(Vector((0.0, 0.0, 1.0)), chest_delta.to_quaternion().to_euler("XYZ").z)
+	right_shoulder = canonical.pose.bones["RightShoulder"]
+	grip_wrist = right_shoulder.head + heading @ Vector((-0.10, -0.18, -0.06))
+	grip_basis = heading @ RIFLE_HAND_BASIS.to_quaternion()
+	gun_origin = grip_wrist + grip_basis @ Vector((0.0, 0.05, 0.005))
+	foregrip = gun_origin + heading @ (
+		RIFLE_FORWARD @ (Vector((-0.03, 0.205, -0.008)) * RIFLE_PREVIEW_SCALE)
+	)
+	support_wrist = foregrip + heading @ Vector((0.015, 0.055, 0.02))
+	left_shoulder = canonical.pose.bones["LeftShoulder"]
+	shoulder_direction = heading @ Vector((0.05, -0.10, -0.01))
+	point_bone(canonical, left_shoulder.name, shoulder_direction)
+	solve_arm(canonical, "Right", grip_wrist, heading @ Vector((-1.0, 0.0, -0.7)))
+	solve_arm(canonical, "Left", support_wrist, heading @ Vector((1.0, 0.0, -0.7)))
+	right_hand = canonical.pose.bones["RightHand"]
+	right_hand.matrix = Matrix.LocRotScale(right_hand.head, grip_basis, Vector((1.0, 1.0, 1.0)))
+	bpy.context.view_layer.update()
+	left_hand = canonical.pose.bones["LeftHand"]
+	left_rest = left_hand.bone.matrix_local.to_quaternion()
+	left_direction = heading @ Vector((0.0, -1.0, 0.0))
+	left_rotation = (left_rest @ Vector((0.0, 1.0, 0.0))).rotation_difference(left_direction)
+	left_hand.matrix = Matrix.LocRotScale(left_hand.head, left_rotation @ left_rest, Vector((1.0, 1.0, 1.0)))
+	bpy.context.view_layer.update()
 
 
 def load_canonical_rig() -> bpy.types.Object:
@@ -104,8 +214,13 @@ def export_clip(filename: str, category: str, animation_name: str, loop: bool) -
 	frame_samples = list(range(start, end + 1))
 	if (end - start) % 1:
 		frame_samples.append(end)
+	bpy.context.scene.frame_set(start)
+	source_hip_origin = source.matrix_world @ source.pose.bones["mixamorig:Hips"].head
+	death_scale = canonical.data.bones["Hips"].head_local.z / source_hip_origin.z if animation_name == "death" else 1.0
 	for frame in frame_samples:
 		bpy.context.scene.frame_set(frame)
+		if animation_name == "death":
+			canonical.pose.bones["Hips"].location = Vector((0.0, 0.0, 0.0))
 		for source_name, canonical_name in bone_map.items():
 			source_bone = source_bones[source_name]
 			source_pose = source.pose.bones[source_name]
@@ -136,7 +251,25 @@ def export_clip(filename: str, category: str, animation_name: str, loop: bool) -
 					corrected_rotation = world_correction @ corrected_rotation
 				target_pose.matrix = Matrix.LocRotScale(pose_position, corrected_rotation, pose_scale)
 				bpy.context.view_layer.update()
-			target_pose.keyframe_insert(data_path="rotation_quaternion", frame=frame, group=canonical_name)
+		if animation_name in ("rifle_idle", "rifle_run"):
+			solve_rifle_pose(canonical)
+		elif animation_name == "survivor_run":
+			solve_run_arms(canonical, source)
+		elif animation_name == "death":
+			bpy.context.view_layer.update()
+			source_hip = source.matrix_world @ source.pose.bones["mixamorig:Hips"].head
+			hip_offset = canonical.matrix_world.inverted().to_3x3() @ (source_hip - source_hip_origin) * death_scale
+			hips = canonical.pose.bones["Hips"]
+			pose_matrix = hips.matrix.copy()
+			pose_matrix.translation += hip_offset
+			hips.matrix = pose_matrix
+			bpy.context.view_layer.update()
+			settle_death_legs(canonical, (frame - start) / (end - start))
+			hips.keyframe_insert(data_path="location", frame=frame, group="Hips")
+		for canonical_name in bone_map.values():
+			canonical.pose.bones[canonical_name].keyframe_insert(
+				data_path="rotation_quaternion", frame=frame, group=canonical_name
+			)
 	canonical_action.use_frame_range = True
 	canonical_action.frame_start = start
 	canonical_action.frame_end = end
@@ -158,17 +291,23 @@ def export_clip(filename: str, category: str, animation_name: str, loop: bool) -
 	output_dir = os.path.join(PROJECT_ROOT, "assets", "characters", "survivors", "animations", category)
 	os.makedirs(output_dir, exist_ok=True)
 	output_path = os.path.join(output_dir, f"{animation_name}.glb")
-	bpy.ops.export_scene.gltf(
-		filepath=output_path,
-		export_format="GLB",
-		use_selection=True,
-		export_animations=True,
-		export_skins=True,
-		export_apply=False,
-		export_force_sampling=True,
-		export_frame_range=True,
-		export_frame_step=1,
-	)
+	with tempfile.TemporaryDirectory(prefix="blue_hour_animation_") as temporary:
+		candidate_path = os.path.join(temporary, f"{animation_name}.glb")
+		bpy.ops.export_scene.gltf(
+			filepath=candidate_path,
+			export_format="GLB",
+			use_selection=True,
+			export_animations=True,
+			export_skins=True,
+			export_apply=False,
+			export_force_sampling=True,
+			export_frame_range=True,
+			export_frame_step=1,
+		)
+		if animation_name in ("survivor_run", "death") and os.path.isfile(output_path):
+			merge_clip_channels(output_path, candidate_path, output_path, animation_name)
+		else:
+			os.replace(candidate_path, output_path)
 	return {"source": filename, "animation": animation_name, "bones": len(bone_map), "frames": len(frame_samples), "path": output_path}
 
 

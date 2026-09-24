@@ -196,12 +196,13 @@ Camp Visual Polish Pass 02 通过 `camp/camp_dressing.gd` 额外复用 `BH_Bench
 
 ## 正式装备武器（Phase 2A）
 
-这三把独立于旧 generated 展示库，运行时来自 WeaponDefinition.model_path，跟随双角色 RightHand；无碰撞，比例为 1 米制。详见 [武器模型报告](../docs/WEAPON_VISUALS.md)。
+运行时装备模型来自 WeaponDefinition.model_path，跟随 RightHand；无碰撞，比例为 1 米制。K9 复用已有 `BH_SMG_01` 网格，只补正式 `WeaponRoot`、双手握点和枪口标记；其几何与正式武器数值未缩放或重制。原有三把的制作背景见 [武器模型报告](../docs/WEAPON_VISUALS.md)。
 
 | 对象 | 正式 GLB | Blender 源 | tris |
 | --- | --- | --- | ---: |
 | 拓荒短刀 | [GLB](../assets/weapons/models/wpn_001_survival_knife.glb) | [blend](blender/weapons/wpn_001_survival_knife.blend) | 848 |
 | P9 | [GLB](../assets/weapons/models/wpn_002_p9_pistol.glb) | [blend](blender/weapons/wpn_002_p9_pistol.blend) | 1,520 |
+| K9 SMG | [GLB](../assets/weapons/models/wpn_004_k9_smg.glb) | [blend](blender/weapons/wpn_004_k9_smg.blend) | 1,332 |
 | A21 | [GLB](../assets/weapons/models/wpn_006_a21_assault_rifle.glb) | [blend](blender/weapons/wpn_006_a21_assault_rifle.blend) | 2,524 |
 
 ## Environment Asset Batch 01（2026-09-18）

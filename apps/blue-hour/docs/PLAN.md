@@ -1514,6 +1514,49 @@ M03: TECHNICALLY COMPLETE；Town Structure: FROZEN。停止于人工视觉审核
 
 详见 [Pose Calibration Phase 1.6 报告](reports/2026-09-23_survivor_animation_pose_calibration_phase_1_6_report.md)。
 
+## 2026-09-24：Survivor Animation SMG Pose Phase 1.7
+
+- [x] 仅重新烘焙 Rifle Idle / Rifle Run 的双臂与手腕骨骼旋转，按现有 SMG 后握把和前握把关系逐帧定位；动画库仍为 11 段，角色 Mesh、冻结 Rig、Weapon Controller 与 Gameplay 不变。
+- [x] macOS Godot 4.7.2 Compatibility 原生渲染正面、45 度、侧面；两段 1600×900、30 fps、4 秒 SMG 预览视频已生成，动画管线 299 checks / 0 failures。
+- [ ] Windows build、独立 EXE 启动及 Windows 画面验收未执行：当前 macOS 没有可用的 Windows 远程连接。
+
+详见 [SMG Pose Phase 1.7 报告](reports/2026-09-24_survivor_animation_smg_pose_phase_1_7_report.md)。
+
+## 2026-09-24：Survivor Animation SMG Grip Phase 1.8
+
+- [x] 只微调 Rifle Idle / Rifle Run 的握点和左手腕方向；Debug Preview SMG 缩放至 `0.84`，正式武器 Profile、Weapon Controller、角色 Mesh、冻结 Rig、Gameplay 与其余 9 段动画不变。
+- [x] Blender background 生成两张 1600×900 三视角静帧与两段 1600×900、30 fps、3 秒三视角视频；Godot headless 动画管线 300 checks / 0 failures，真实 Expedition 流程连通 58 checks / 0 failures。未抢占用户桌面焦点。
+- [ ] 真实 Expedition 原生视觉验收、Windows build 和独立 EXE 启动待执行；当前无可保证不抢焦点的 Godot GUI 截图路径，也无可用 Windows 远程连接。Debug Preview 精修在此收口，不安排 Phase 1.9。
+
+详见 [SMG Grip Phase 1.8 报告](reports/2026-09-24_survivor_animation_smg_grip_phase_1_8_report.md)。
+
+## 2026-09-24：Survivor Animation Phase 2 Expedition Runtime Integration
+
+- [x] 仅夏知遥 `SUR_001` 在正式 Expedition 的现有角色、相机、导航、武器、自动战斗和 HUD 路径接入 11 段 Survivor 动画；K9 SMG 正式模型补齐握把和枪口节点，未改武器数值、角色 Mesh、Rig、地图或玩法速度。
+- [x] 正式 Medium Town Mission headless 专项 33 checks / 0 failures，覆盖 Idle、Run、Rifle Idle/Run、移动及静止自动射击、小刀、受击恢复和完整死亡动画；跑动稳定段左手前握把误差小于 2 cm。动画管线 300 checks、武器视觉 1789 checks、Expedition E00 58 checks 均为 0 failures；旧 Public/Combat 图回归保留在苏晚星并通过。
+- [x] Godot 4.7.2 headless import 通过；全程未启动或激活 GUI，没有抢占桌面焦点。
+- [x] 原生 Expedition 画面与 K9 正式比例已在下方 Final Visual QA 完成；Run 与 Death 仍有阻断级视觉问题。Windows build/EXE 尚无可用环境，因此不宣布 V1 正式验收或批量接入其余幸存者。
+
+证据、状态映射和待验收项见 [Phase 2 Expedition Runtime 报告](reports/2026-09-24_survivor_animation_expedition_runtime_phase_2_report.md)。
+
+## 2026-09-24：Survivor Animation Phase 2 Final Visual QA
+
+- [x] 后台复核 Survivor Animation Pipeline 300、正式 Expedition 动画 33、Expedition E00 58、Weapon Visuals 1789 与 Public Locomotion 495 项检查，均为 0 failures；没有新的脚本或资源错误。
+- [x] 正式 Medium Town Mission 专项新增可选原生采集模式，沿用正式相机、夏知遥、K9、自动战斗和 HUD；默认 headless 测试不变。Godot 通过 `open -n -g -j` 后台隐藏启动，采集期间没有成为前台应用。
+- [x] 原生 Expedition 录像 1600×900 / 60 fps / 33.07 秒、十张正式镜头 PNG 和 MP4 转码均已完成；原生专项 53 checks / 0 failures。K9 正式尺寸与 Rifle Idle / Rifle Run 可接受。
+- [ ] 视觉验收结论 **B：暂不通过**。普通 Run 双臂持续高抬，Death 末帧腿部与身体姿势明显扭曲；仅定点校准这两项并复核后，才能宣布 V1 完成、批量接入其余幸存者或推进 ENM_001。
+
+原生录像、截图、逐项 PASS/FAIL 和复现命令见 [Phase 2 Final Visual QA 报告](reports/2026-09-24_survivor_animation_phase_2_final_visual_qa_report.md)。
+
+## 2026-09-24：Survivor Animation Phase 2.1 Run / Death 定点修复
+
+- [x] 仅修正普通 `survivor_run` 双臂与 `death` 髋部位移、末段双腿；Run 根骨、躯干与腿部原曲线保持不变，AnimationLibrary 其余 9 段逐块校验未变化。未修改 Mesh、冻结 Rig、武器、Gameplay、UI 或其他幸存者。
+- [x] 正式 Medium Town / Expedition 相机 `size=23` 后台隐藏采集：1600×900、60 fps、10.83 秒 MP4，Run / Death 两张正式截图。Run 与 Death 视觉复核均 **PASS**；Death 完整播放并保持末帧，没有抢占桌面焦点。
+- [x] 动画管线 301、正式 Expedition 动画 33、Expedition E00 58、Run / Death 专项 headless 12 项检查，全部 0 failures。Survivor Animation V1 的内容、macOS 正式运行时和视觉验收通过，可作为其余幸存者动画复用的基线。
+- [ ] Windows build、独立 EXE 启动与 Windows 原生画面验收仍需 Windows 环境；未完成跨平台发布验收。
+
+修改、数据范围与画面证据见 [Phase 2.1 Run / Death 报告](reports/2026-09-24_survivor_animation_run_death_phase_2_1_report.md)。
+
 ## 2026-09-23：Weapon RarityProfile Resource 化 Phase W2-2
 
 - [x] 新增 Common / Uncommon / Rare / Epic / Legendary 五个 `WeaponRarityProfileData` Resource 与 `WeaponRarityRegistry`；注册表校验唯一 ID/tier、tier 对应、颜色格式和冻结槽位合同。

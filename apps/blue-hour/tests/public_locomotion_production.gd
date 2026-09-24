@@ -70,9 +70,11 @@ func run() -> void:
 			for frame: int in 24:
 				c.update_motion(speed, 2.8, 1.0 / 60)
 				await process_frame
-			var expected: StringName = &"Idle" if speed == 0.0 else &"Walk" if speed < 1.85 else &"Run"
-			check(c.current_state == expected and c.playback.get_current_node() == expected, id + " state " + expected)
-			var rate := 1.0 if speed == 0.0 else speed / (1.24486 if expected == &"Walk" else 2.27623)
+			var expedition_candidate: bool = actor.data.survivor_id == "SUR_001"
+			var expected: StringName = &"Idle" if speed == 0.0 else &"Run" if expedition_candidate else &"Walk" if speed < 1.85 else &"Run"
+			var animation_node: StringName = StringName(String(expected).to_upper()) if expedition_candidate else expected
+			check(c.current_state == expected and c.playback.get_current_node() == animation_node, id + " state " + expected)
+			var rate := 1.0 if speed == 0.0 else clampf(speed / 2.8, 0.55, 1.6) if expedition_candidate else speed / (1.24486 if expected == &"Walk" else 2.27623)
 			check(absf(c.playback_rate - rate) < .00001, id + " exact speed ratio")
 		var before: float = c.playback.get_current_play_position()
 		c.update_motion(2.8, 2.8, 0.0)

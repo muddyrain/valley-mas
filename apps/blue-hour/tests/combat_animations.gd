@@ -62,7 +62,9 @@ func run() -> void:
 	stage.add_child(camera)
 	camera.position = Vector3(2.7, 2.5, -4)
 	camera.look_at(Vector3(0, .84, 0))
-	for id: String in ["xia_zhiyao", "su_wanxing"]:
+	# Xia now uses the Survivor Expedition graph; its formal behavior is covered
+	# by survivor_expedition_animation_runtime.gd.
+	for id: String in ["su_wanxing"]:
 		var actor := Survivor.new()
 		stage.add_child(actor)
 		actor.setup(load("res://data/survivors/" + id + ".tres"), catalog.traits[0], catalog.by_id(catalog.weapons, Registry.A21))
