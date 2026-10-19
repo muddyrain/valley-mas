@@ -1,6 +1,6 @@
 # Valley MAS AI 协作入口
 
-`CLAUDE.md` 是根协作规则的唯一正文；`AGENTS.md` 仅为指向本文件的兼容软链接。
+`CLAUDE.md` 是 Codex 与 Claude 共用的根协作规则正文；`AGENTS.md` 是独立的普通 Markdown 入口，要求 Codex 显式读取本文件并按任务范围读取局部规则。
 
 ## 任务进入
 

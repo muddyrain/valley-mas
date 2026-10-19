@@ -1,46 +1,17 @@
-CLAUDE.md
+# Valley MAS — Codex 仓库入口
 
-<!-- gitnexus:start -->
-# GitNexus — Code Intelligence
+本文件使用普通 Markdown，负责指引 Codex 读取共享规则及目标子项目约束。
 
-This project is indexed by GitNexus as **valley-mas** (29658 symbols, 77270 relationships, 300 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+## 必须读取的规则
 
-> Index stale? Run `node .gitnexus/run.cjs analyze` from the project root — it auto-selects an available runner. No `.gitnexus/run.cjs` yet? `npx gitnexus analyze` (npm 11 crash → `npm i -g gitnexus`; #1939).
+1. 开始仓库任务前，完整读取并遵守根 [CLAUDE.md](./CLAUDE.md)。它是 Codex 与 Claude 共用的 Monorepo 规则正文，包含 Skills 路由、工作区保护、GitNexus、验证与交付要求；链接本身不等于已读取正文。
+2. 按任务范围读取目标子项目的局部 `AGENTS.md`，并检查目标路径上更深层的 `AGENTS.override.md` / `AGENTS.md`。同层优先使用 override，局部约束补充共享规则；用户本次明确要求优先于仓库的一般规定。
+3. 涉及 **Blue Hour / 蓝时归航 / `apps/blue-hour/`** 的任务，在分析或修改前必须读取 [apps/blue-hour/AGENTS.md](./apps/blue-hour/AGENTS.md)，再按其中入口读取项目上下文。即使 Codex 从 Monorepo 根目录启动，也必须执行这一步，不能假定子目录规则已自动加载。
 
-## Always Do
+Blue Hour 读取链：`AGENTS.md` → `CLAUDE.md` → `apps/blue-hour/AGENTS.md` → `apps/blue-hour/PROJECT_CONTEXT.md`。其他子项目的入口按共享规则选择。
 
-- **MUST run impact analysis before editing any symbol.** Before modifying a function, class, or method, run `impact({target: "symbolName", direction: "upstream"})` and report the blast radius (direct callers, affected processes, risk level) to the user.
-- **MUST run `detect_changes()` before committing** to verify your changes only affect expected symbols and execution flows. For regression review, compare against the default branch: `detect_changes({scope: "compare", base_ref: "master"})`.
-- **MUST warn the user** if impact analysis returns HIGH or CRITICAL risk before proceeding with edits.
-- When exploring unfamiliar code, use `query({search_query: "concept"})` to find execution flows instead of grepping. It returns process-grouped results ranked by relevance.
-- When you need full context on a specific symbol — callers, callees, which execution flows it participates in — use `context({name: "symbolName"})`.
-- For security review, `explain({target: "fileOrSymbol"})` lists taint findings (source→sink flows; needs `analyze --pdg`).
+## Monorepo 边界
 
-## Never Do
-
-- NEVER edit a function, class, or method without first running `impact` on it.
-- NEVER ignore HIGH or CRITICAL risk warnings from impact analysis.
-- NEVER rename symbols with find-and-replace — use `rename` which understands the call graph.
-- NEVER commit changes without running `detect_changes()` to check affected scope.
-
-## Resources
-
-| Resource | Use for |
-|----------|---------|
-| `gitnexus://repo/valley-mas/context` | Codebase overview, check index freshness |
-| `gitnexus://repo/valley-mas/clusters` | All functional areas |
-| `gitnexus://repo/valley-mas/processes` | All execution flows |
-| `gitnexus://repo/valley-mas/process/{name}` | Step-by-step execution trace |
-
-## CLI
-
-| Task | Read this skill file |
-|------|---------------------|
-| Understand architecture / "How does X work?" | `.claude/skills/gitnexus/gitnexus-exploring/SKILL.md` |
-| Blast radius / "What breaks if I change X?" | `.claude/skills/gitnexus/gitnexus-impact-analysis/SKILL.md` |
-| Trace bugs / "Why is X failing?" | `.claude/skills/gitnexus/gitnexus-debugging/SKILL.md` |
-| Rename / extract / split / refactor | `.claude/skills/gitnexus/gitnexus-refactoring/SKILL.md` |
-| Tools, resources, schema reference | `.claude/skills/gitnexus/gitnexus-guide/SKILL.md` |
-| Index, status, clean, wiki CLI commands | `.claude/skills/gitnexus/gitnexus-cli/SKILL.md` |
-
-<!-- gitnexus:end -->
+- 保留已有工作成果，只修改本次授权范围；不自动暂存、提交、切换分支、重置或清理。
+- 将计划与历史报告作为上下文，按当前代码和实际验证判断实现状态；未经本次授权不继续历史任务。
+- 验证按实际变更选择，交付时分别说明已验证、未验证和遗留问题。完整规则与命令以共享正文及局部入口为准。
