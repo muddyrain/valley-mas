@@ -6,6 +6,8 @@
 
 实现状态按需读取 `docs/PLAN.md`，操作与架构按需读取 `README.md`。
 
+涉及玩法、战斗、角色控制、时间、搜刮、营地或 UI 设计时，必须阅读 [game-design.md 的「游戏定位与核心体验」契约](docs/design/game-design.md#游戏定位与核心体验)，并按需读取相关细则。沿用已确认的核心玩法，未经明确授权不得改变。
+
 ## 局部边界
 
 - 所有新增或修改 3D/2D 美术资产前必须读取 `art/ART_BIBLE.md`、`art/ASSET_PIPELINE.md` 和 `art/MODEL_CATALOG.md`；优先复用与组合现有资产，只有不存在合适资产时才创建新模型。
