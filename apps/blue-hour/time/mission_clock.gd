@@ -2,6 +2,7 @@ extends RefCounted
 signal phase_changed(phase: int)
 signal warning_changed(active: bool)
 enum { DAY, BLUE_HOUR, NIGHT }
+const TIME_EPSILON: float = 0.000001
 var elapsed: float = 0.0
 var phase: int = DAY
 var settings: Resource
@@ -18,9 +19,9 @@ func advance(delta: float, freeze_day_clock: bool = false) -> void:
 		return
 	elapsed += maxf(delta, 0.0)
 	var next_phase := DAY
-	if elapsed >= settings.day_seconds + settings.blue_seconds:
+	if elapsed + TIME_EPSILON >= settings.day_seconds + settings.blue_seconds:
 		next_phase = NIGHT
-	elif elapsed >= settings.day_seconds:
+	elif elapsed + TIME_EPSILON >= settings.day_seconds:
 		next_phase = BLUE_HOUR
 	if next_phase != phase:
 		phase = next_phase
@@ -69,7 +70,7 @@ func night_elapsed() -> float:
 	return maxf(0.0, elapsed - settings.day_seconds - settings.blue_seconds)
 
 func threat_level() -> int:
-	return 0 if phase != NIGHT else 1 + int(night_elapsed() / settings.night_threat_seconds)
+	return 0 if phase != NIGHT else 1 + int((night_elapsed() + TIME_EPSILON) / settings.night_threat_seconds)
 
 func enemy_threat_level() -> int:
 	# Preserve the HUD's zero daytime alert while using level one as the combat baseline.

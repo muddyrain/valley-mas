@@ -1,5 +1,31 @@
 # 蓝时归航实施计划
 
+## 2026-10-19：R2.1 — 高倍率模拟尾步
+
+- [x] 修复 Mission 子步减法舍入产生的额外 gameplay tick；余量并入当前子步，保留真实技能到期边界和极短有效时间，不修改角色动画资源或播放倍率。
+- [x] 先复现再修复：simulation_substeps 606/36 → 606/0；Town／City 的 ×1／×2／×4 移动、停止、最终速度、动画、感染者采样和有效时间守恒通过。专项接入 test／build。
+- [x] R2 173/0、R1 26/0、Ambient 56/0、City Noise 13/0；正式 main.tscn 通过 F1 实际选择三档倍率，移动／停止及暂停恢复取得两段 1600×900 录像。
+- [ ] 完整 Windows build／新 EXE：仍 BLOCKED，本轮实际 build 在既有 Camp UI 门禁失败，未绕过导出。Focus、旧效果与其他门禁债不在本轮修复范围。
+- 本轮作用与并行动画线程的资源／节奏修改分开取证；详见 [R2.1 交付报告](development/blue_hour_r2_1_animation_tailstep_fix_report.md)。未启动 R3／R4。
+
+## 2026-10-19：R2 — Time Simulation Contract
+
+- [x] Mission 作为唯一局部倍率边界，按有界模拟子步驱动 Town Ambient；保留 City／Town 各自 Enemy／Noise 更新权，不重复缩放或推进。
+- [x] 统一加载、暂停、恢复和结束边界；感染者动画、巴士准备／关门及上车缩放遵循模拟时间，保留暮色延缓只冻结昼夜的规则与 City 下车阶段边界。
+- [x] 时间专项 173/0、R1 日循环 26/0、Ambient 56/0、City Noise 13/0；R1／R2 专项已加入 test 与 build。旧 search_dispatch 两项及武器／效果专项失败保留，不放宽断言。
+- [x] 正式 main.tscn 的四类暂停、实际 ×1／×2／×4 下拉选择、搜刮归航／唯一结算／下一天、自然昼夜和自然感染者全灭保存均取得隔离原生运行证据；四段指定 1600×900 录像已编码、解码核对。
+- [ ] 完整 Windows build／新 EXE：BLOCKED。本次指令线 45/0，之后停在既有 Camp UI 的 member_buttons／左侧能力契约失败；未执行到新增专项门禁或导出。一次通过不关闭已确认的指令线节流风险。
+- R3 结束页与 R4 营地交互未改。实际量测、旧断言差异、录屏负载限制及全部证据见 [R2 交付报告](development/blue_hour_r2_time_contract_report.md)。
+
+## 2026-10-19：R1 — Medium Town 归航闭环
+
+- [x] Town 接入既有 MissionClock、昼夜导演、全灭和撤离终局；保留 Town / City 各自的敌人推进权，防止双重 tick。
+- [x] Town 归航与出生点可达性验证使用正式巴士出口，解决碰撞体中心目标导致的归航拒绝和夜间零增援。
+- [x] `tests/mission_dayloop.gd`：Town / FIXED_LEGACY 共 26 项通过，含真实路径到位、缺员等待、关门、唯一结果和全灭；Clock、规则、跨日及并行指令专项通过。
+- [x] 正式 `core/main.tscn` 完成菜单 → 营地 → 今日行动 → Town → 搜刮 → 行走归航 → 结算 → 下一天；自然 150s / 18s 昼夜、自然来敌攻击全灭、库存/成员/存档一致性取得真实运行证据。全灭使用正式 Ctrl 手动瞄准空地，不改血量或 Debug 接敌。
+- [ ] 完整 Windows build / 新 EXE：BLOCKED。两次构建停在 Survivor command 的指令线脚部跟随断言；独立对照通过，时序根因未收敛。未绕过门禁导出，未覆盖旧 EXE。旧 City 搜索专项另有修复前后相同的两项失败。
+- R2 暂停、R3 结束页、R4 营地 HUD 未改。报告与三段录像入口见 [R1 交付报告](development/blue_hour_r1_town_dayloop_closure_report.md)。历史记录按原阶段保留，不代表当前全量构建通过。
+
 ## 2026-09-21：Map Phase 1.1.5 — MiniMap Geometry Full Snapshot
 
 - [x] `mission.runtime_data.minimap_geometry` 扩展为版本化快照：道路提供 centerline、polygon、width、type；建筑默认提供 polygon、位置、尺寸、朝向、类型、入口与地块信息；不再依赖已发现状态。

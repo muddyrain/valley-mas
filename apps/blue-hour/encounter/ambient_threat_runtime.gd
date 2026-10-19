@@ -25,6 +25,7 @@ func setup(target: Node3D) -> void:
 	mission = target
 	rng.seed = int(mission.rng.seed) ^ 0x414d4249
 	mission.search_completed.connect(_on_search_completed)
+	mission.simulation_advanced.connect(advance)
 	if mission.town_runtime_ready:
 		if mission.survivor_commands_enabled or mission.city.navigation.ready:
 			_activate_town()
@@ -33,8 +34,9 @@ func setup(target: Node3D) -> void:
 	else:
 		runtime_ready = true
 
-func _physics_process(delta: float) -> void:
-	if not is_instance_valid(mission) or not mission.active:
+func advance(delta: float) -> void:
+	# delta is already scaled and bounded by Mission; no independent frame loop.
+	if delta <= 0 or not is_instance_valid(mission) or not mission.active:
 		return
 	var started: int = Time.get_ticks_usec()
 	if mission.town_runtime_ready:
@@ -103,7 +105,7 @@ func _advance_search_noise(delta: float) -> void:
 			continue
 		active_ids[id] = true
 		var left: float = float(search_noise_timers.get(id, SEARCH_NOISE_INTERVAL)) - delta
-		if left <= 0.0:
+		while left <= 0.0:
 			_emit_search_noise(id, false, task.get("worker") as Node)
 			left += SEARCH_NOISE_INTERVAL
 		search_noise_timers[id] = left

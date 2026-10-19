@@ -14,6 +14,8 @@ var playback_speed_variation: float = 1.0
 
 func configure(player: AnimationPlayer, random_source: RandomNumberGenerator) -> void:
 	animation_player = player
+	if animation_player != null:
+		animation_player.callback_mode_process = AnimationMixer.ANIMATION_CALLBACK_MODE_PROCESS_MANUAL
 	animation_start_offset = random_source.randf_range(0.0, 0.9)
 	playback_speed_variation = random_source.randf_range(0.95, 1.05)
 

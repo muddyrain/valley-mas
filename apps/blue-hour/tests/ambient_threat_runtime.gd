@@ -109,14 +109,14 @@ func run() -> void:
 	check(is_instance_valid(listener), "Noise listener spawns on Medium Town navigation")
 	var task: RefCounted = _fake_search_task(worker)
 	mission.search_tasks[site_id] = task
-	runtime._physics_process(1.01)
+	runtime.advance(1.01)
 	check(runtime.search_noise_events == 1 and runtime.last_search_event.type_name() == "SEARCH",
 		"Active search emits one NoiseEvent per second")
 	check(is_equal_approx(runtime.last_search_event.radius, 12.0), "Large building search uses Noise 12")
 	check(listener.state_name() == "INVESTIGATE_NOISE", "Listening infected enters INVESTIGATE_NOISE")
 	var before: float = listener.position.distance_to(site.spec.entry)
 	for frame: int in 90:
-		runtime._physics_process(1.0 / 30.0)
+		runtime.advance(1.0 / 30.0)
 	check(listener.position.distance_to(site.spec.entry) < before, "Investigating infected approaches the search noise")
 	worker.inside_building = false
 	mission.camera_center = site.spec.entry
@@ -148,7 +148,7 @@ func run() -> void:
 	var perf_before: int = runtime.update_usec
 	var updates_before: int = runtime.update_count
 	for frame: int in 300:
-		runtime._physics_process(1.0 / 60.0)
+		runtime.advance(1.0 / 60.0)
 	var perf_ms: float = (runtime.update_usec - perf_before) / (1000.0 * maxi(1, runtime.update_count - updates_before))
 	check(perf_ms < 8.0, "Ambient threat update stays below 8ms average: %.3fms" % perf_ms)
 	FileAccess.open(OUTPUT + "runtime.json", FileAccess.WRITE).store_string(JSON.stringify({

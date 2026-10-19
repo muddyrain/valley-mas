@@ -7,6 +7,9 @@ signal search_loot_collected(id: String, worker_name: String, loot: Dictionary)
 signal watch_warning_changed(active: bool)
 signal navigation_ready
 signal command_rejected(reason: String)
+signal simulation_advanced(delta: float)
+const MAX_SIMULATION_STEP: float = 1.0 / 60.0
+const SIMULATION_ROUNDING_TOLERANCE: float = 8.0 * 2.220446049250313e-16
 const City = preload("res://maps/city.gd")
 const Survivor = preload("res://survivors/survivor.gd")
 const Clock = preload("res://time/mission_clock.gd")
@@ -82,6 +85,8 @@ var search_status: String:
 var extraction: bool = false
 var extraction_left: float = 0.0
 var closing_left: float = -1.0
+var _boarding_scales: Dictionary = {}
+var _closing_door_start: float = 0.0
 var spawn_left: float = 20.0
 var kills: int = 0
 var invincible: bool = false
@@ -166,7 +171,6 @@ func setup(content: RefCounted, resources: RefCounted, loadout: Array[String], s
 	clock = Clock.new(clock_rules)
 	if town_runtime_ready:
 		city = town_runtime_root
-		director_enabled = false
 		var search_started := Time.get_ticks_usec()
 		search_registry = TownSearchRegistry.new()
 		search_registry.setup(self)
@@ -320,53 +324,54 @@ func debug_equip(index: int, equipment: Resource) -> void:
 	if campaign != null:
 		member.apply_trait(campaign.member_trait(member.data.id))
 
+func simulation_delta(frame_delta: float) -> float:
+	# Engine.time_scale stays at one. Only this boundary scales gameplay time.
+	if not active or time_scale <= 0 or (town_runtime_ready and not survivor_commands_enabled):
+		return 0.0
+	return maxf(0.0, frame_delta) * time_scale
+
 func _physics_process(delta: float) -> void:
-	if not active or time_scale <= 0:
+	var left: float = simulation_delta(delta)
+	if left <= 0.0:
 		return
-	var left := maxf(0.0, delta * time_scale)
-	# Split at effect expiry so a clock freeze cannot eat the rest of a large frame.
+	# City disembarkation remains one outer-frame phase. Do not start combat or
+	# emit arrival noise in a later substep of the frame that releases the squad.
+	if arrival != null and not arrival.finished:
+		_advance_world(left)
+		if powers != null:
+			powers.advance(left)
+		return
+	# Bound combat/AI steps at every speed, retaining the exact effect expiry split.
 	while left > 0 and active:
-		if powers == null:
-			_advance_world(left)
-			left = 0.0
-			break
-		var dt := minf(left, powers.next_expiry())
+		var dt: float = minf(left, MAX_SIMULATION_STEP)
+		var expiry: float = powers.next_expiry() if powers != null else INF
+		dt = minf(dt, expiry)
+		# Consume subtraction roundoff in this step, never dropping time or
+		# crossing an actual effect boundary inside the remaining interval.
+		if expiry >= left and left - dt <= left * SIMULATION_ROUNDING_TOLERANCE:
+			dt = left
 		_advance_world(dt)
-		powers.advance(dt)
+		if active and powers != null:
+			powers.advance(dt)
 		left = maxf(0.0, left - dt)
 func _advance_world(dt: float) -> void:
+	if dt <= 0 or not active or (town_runtime_ready and not survivor_commands_enabled):
+		return
 	if periodic_effects != null:
 		periodic_effects.advance(dt, survivors)
-	if town_runtime_ready:
-		if survivor_commands_enabled:
-			for task: RefCounted in search_tasks.values().duplicate():
-				task.prepare(dt, self)
-			for task: RefCounted in exiting_tasks:
-				task.advance_exit(dt)
-			exiting_tasks = exiting_tasks.filter(func(task: RefCounted): return task.exit_worker != null)
-			_prune_tasks()
-			regroup_left -= dt
-			if regroup_left <= 0:
-				refresh_regroup()
-			for survivor: Node3D in survivors:
-				survivor.tick(dt, self)
-			for task: RefCounted in search_tasks.values().duplicate():
-				task.advance(dt, self)
-			_prune_tasks()
-			_update_pickups()
-		if exploration != null:
-			exploration.advance(dt)
-		return
-	if noise != null:
+	# Town's AmbientThreatRuntime owns noise and enemy ticks; Mission owns the
+	# clock and completion for every provider so neither is advanced twice.
+	if not town_runtime_ready and noise != null:
 		noise.advance(dt)
 	if arrival != null and not arrival.finished:
 		arrival.advance(dt, self)
 		if exploration != null:
 			exploration.advance(dt)
 		return
-	if arrival_noise_pending:
+	if not town_runtime_ready and arrival_noise_pending:
 		arrival_noise_pending = false
 		noise.emit_noise(catalog.map.bus_position, catalog.map.encounter.arrival_noise_radius, NoiseSystem.Event.NoiseType.ARRIVAL, 1.0, city)
+	action_elapsed += dt
 	if clock != null:
 		clock.advance(dt, effects.amount("freeze_day_clock") > 0)
 	_sync_watch_warning()
@@ -388,11 +393,14 @@ func _advance_world(dt: float) -> void:
 		refresh_regroup()
 	for survivor in survivors:
 		survivor.tick(dt, self)
-	for enemy in enemies.duplicate():
-		if enemy.active:
-			enemy.tick(dt, self)
-		else:
-			_retire_enemy(enemy)
+	# Ambient retains Town Enemy/Noise ownership, but consumes this same step.
+	simulation_advanced.emit(dt)
+	if not town_runtime_ready:
+		for enemy in enemies.duplicate():
+			if enemy.active:
+				enemy.tick(dt, self)
+			else:
+				_retire_enemy(enemy)
 	if living().is_empty():
 		_finish(true)
 		return
@@ -1134,7 +1142,10 @@ func command_extract() -> void:
 	_release_tasks()
 	if controls != null:
 		controls.reset()
-	_move_members(catalog.map.bus_position, living())
+	# Town's bus center is solid; its authored exit is the boarding approach.
+	var return_point: Vector3 = runtime_data.arrival_exit if town_runtime_ready else catalog.map.bus_position
+	if not _move_members(return_point, living()):
+		return
 	extraction = true
 	extraction_left = catalog.map.extraction_seconds
 	order = "全队归航"
@@ -1150,6 +1161,11 @@ func board_count() -> int:
 func _update_extraction(delta: float) -> void:
 	if closing_left >= 0:
 		closing_left -= delta
+		var closing_elapsed: float = 1.4 - maxf(0.0, closing_left)
+		for survivor: Node3D in living():
+			if _boarding_scales.has(survivor):
+				survivor.scale = _boarding_scales[survivor].lerp(Vector3.ZERO, clampf(closing_elapsed / 0.65, 0.0, 1.0))
+		city.bus_door.position.x = _closing_door_start + 0.8 * clampf(closing_elapsed, 0.0, 1.0)
 		if closing_left <= 0:
 			_finish(false)
 		return
@@ -1166,11 +1182,12 @@ func _update_extraction(delta: float) -> void:
 	if extraction_left <= 0:
 		closing_left = 1.4
 		order = "全员上车 · 车门关闭"
+		_boarding_scales.clear()
+		_closing_door_start = city.bus_door.position.x
 		for survivor in members:
 			survivor.boarding = true
 			survivor.stop()
-			create_tween().tween_property(survivor, "scale", Vector3.ZERO, 0.65)
-		create_tween().tween_property(city.bus_door, "position:x", city.bus_door.position.x + 0.8, 1.0)
+			_boarding_scales[survivor] = survivor.scale
 		sound.play_cue("home")
 
 func _finish(wiped: bool) -> void:

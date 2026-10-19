@@ -131,6 +131,8 @@ func configure_encounter(settings: Resource, seed_value: int) -> void:
 	rig.rotation.y = rng.randf_range(-PI, PI)
 
 func tick(delta: float, mission: Node3D) -> void:
+	if active and animation_player != null:
+		animation_player.advance(delta)
 	if hit_feedback != null:
 		hit_feedback.advance(delta)
 	if not active:

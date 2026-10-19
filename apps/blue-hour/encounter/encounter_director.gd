@@ -135,7 +135,9 @@ func valid_spawn(mission: Node3D, point: Vector3) -> bool:
 	for enemy: Node3D in mission.enemies:
 		if enemy.active and enemy.position.distance_to(point) < config.spawn_spacing:
 			return false
-	var route: PackedVector3Array = mission.city.path(point, mission.catalog.map.bus_position)
+	# The Town bus body blocks its center; validate access to its authored exit.
+	var return_point: Vector3 = mission.runtime_data.arrival_exit if mission.town_runtime_ready else mission.catalog.map.bus_position
+	var route: PackedVector3Array = mission.city.path(point, return_point)
 	return not route.is_empty()
 
 func _spawn(mission: Node3D, candidate: Vector3, category: String) -> Node3D:
