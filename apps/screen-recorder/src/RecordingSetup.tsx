@@ -11,10 +11,13 @@ import {
   X,
 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
-import { isRecordingContainerSupported, type RecordingContainer } from './core/mime';
+import {
+  isRecordingContainerSupported,
+  type RecordingContainer,
+  resolveRecordingContainer,
+} from './core/mime';
 import {
   DEFAULT_RECORDING_OPTIONS,
-  getDefaultRecordingOptions,
   getMediaDeviceAvailability,
   getMediaDeviceState,
   type RecordingOptions,
@@ -24,14 +27,16 @@ import type { RecorderSnapshot } from './shared/contracts';
 export function RecordingSetup() {
   const [error, setError] = useState<string>();
   const [starting, setStarting] = useState(false);
-  const [container, setContainer] = useState<RecordingContainer>('webm');
+  const [container, setContainer] = useState<RecordingContainer>('mp4');
+  const [formatNote, setFormatNote] = useState<string>();
+  const [ready, setReady] = useState(false);
+  const availabilityRef = useRef<{ camera: boolean; microphone: boolean } | undefined>(undefined);
   const [options, setOptions] = useState<RecordingOptions>(DEFAULT_RECORDING_OPTIONS);
   const [snapshot, setSnapshot] = useState<RecorderSnapshot>();
   const [deviceAvailability, setDeviceAvailability] = useState<{
     camera: boolean;
     microphone: boolean;
   }>();
-  const defaultsAppliedRef = useRef(false);
   const mp4Supported =
     typeof MediaRecorder !== 'undefined' &&
     isRecordingContainerSupported('mp4', (mime) => MediaRecorder.isTypeSupported(mime));
@@ -39,11 +44,33 @@ export function RecordingSetup() {
   useEffect(() => {
     const applySnapshot = (next: RecorderSnapshot) => {
       setSnapshot(next);
-      if (!defaultsAppliedRef.current) {
-        defaultsAppliedRef.current = true;
-        setOptions(getDefaultRecordingOptions(next.platform));
-      }
     };
+    let active = true;
+    void window.screenRecorder
+      .getCapturePreferences()
+      .then((preferences) => {
+        if (!active) return;
+        const preferred = preferences.recording.container;
+        const resolved = resolveRecordingContainer(preferred, (mime) =>
+          MediaRecorder.isTypeSupported(mime),
+        );
+        setContainer(resolved);
+        if (resolved !== preferred)
+          setFormatNote(
+            `${preferred === 'mp4' ? 'MP4' : 'WebM'} 在此设备不可用，已切换为 ${resolved === 'mp4' ? 'MP4' : 'WebM'}`,
+          );
+        const availability = availabilityRef.current;
+        setOptions({
+          ...preferences.recording.options,
+          camera: availability?.camera === false ? false : preferences.recording.options.camera,
+          microphone:
+            availability?.microphone === false ? false : preferences.recording.options.microphone,
+        });
+        setReady(true);
+      })
+      .catch((caught) => {
+        if (active) setError(caught instanceof Error ? caught.message : '无法读取录屏偏好');
+      });
     void window.screenRecorder.getSnapshot().then(applySnapshot);
     const disposeSnapshot = window.screenRecorder.onSnapshot(applySnapshot);
     const onKeyDown = (event: KeyboardEvent) => {
@@ -51,6 +78,7 @@ export function RecordingSetup() {
     };
     window.addEventListener('keydown', onKeyDown);
     return () => {
+      active = false;
       disposeSnapshot();
       window.removeEventListener('keydown', onKeyDown);
     };
@@ -63,6 +91,7 @@ export function RecordingSetup() {
       .then((devices) => {
         if (!active) return;
         const availability = getMediaDeviceAvailability(devices);
+        availabilityRef.current = availability;
         setDeviceAvailability(availability);
         setOptions((current) => ({
           ...current,
@@ -81,6 +110,7 @@ export function RecordingSetup() {
   }, []);
 
   const start = async () => {
+    if (!ready || starting) return;
     if (options.camera && deviceAvailability?.camera === false) {
       setError('未检测到摄像头');
       return;
@@ -93,6 +123,12 @@ export function RecordingSetup() {
       setStarting(false);
       setError(caught instanceof Error ? caught.message : '无法开始录屏');
     }
+  };
+
+  const remember = (nextContainer: RecordingContainer, nextOptions: RecordingOptions) => {
+    void window.screenRecorder
+      .updateRecordingPreferences({ container: nextContainer, options: nextOptions })
+      .catch((caught) => setError(caught instanceof Error ? caught.message : '无法保存录屏偏好'));
   };
 
   const cancelFromRightClick = (event: React.MouseEvent) => {
@@ -126,7 +162,7 @@ export function RecordingSetup() {
       <button
         type="button"
         className="recording-setup-start"
-        disabled={starting}
+        disabled={starting || !ready}
         onClick={() => void start()}
       >
         {starting ? '正在准备…' : '开始录制'}
@@ -143,9 +179,13 @@ export function RecordingSetup() {
                 type="button"
                 role="radio"
                 aria-checked={container === value}
-                disabled={disabled}
+                disabled={disabled || starting || !ready}
                 title={disabled ? '当前设备不支持原生 MP4 录制' : undefined}
-                onClick={() => setContainer(value)}
+                onClick={() => {
+                  setContainer(value);
+                  setFormatNote(undefined);
+                  remember(value, options);
+                }}
               >
                 <i /> {value === 'mp4' ? 'MP4' : 'WebM'}
               </button>
@@ -171,7 +211,7 @@ export function RecordingSetup() {
               key={key}
               type="button"
               aria-pressed={enabled}
-              disabled={!supported || starting}
+              disabled={!supported || starting || !ready}
               title={
                 checkingDevice
                   ? '正在检测设备'
@@ -181,7 +221,11 @@ export function RecordingSetup() {
                       ? 'macOS 暂不支持直接录制系统声音'
                       : undefined
               }
-              onClick={() => setOptions((current) => ({ ...current, [key]: !current[key] }))}
+              onClick={() => {
+                const next = { ...options, [key]: !options[key] };
+                setOptions(next);
+                remember(container, next);
+              }}
             >
               <Icon className="recording-option-icon" aria-hidden="true" strokeWidth={1.8} />
               <strong>{label}</strong>
@@ -211,13 +255,12 @@ export function RecordingSetup() {
           max="100"
           step="5"
           value={Math.round(options.audioGain * 100)}
-          disabled={!options.systemAudio || starting}
-          onChange={(event) =>
-            setOptions((current) => ({
-              ...current,
-              audioGain: Number(event.target.value) / 100,
-            }))
-          }
+          disabled={!options.systemAudio || starting || !ready}
+          onChange={(event) => {
+            const next = { ...options, audioGain: Number(event.target.value) / 100 };
+            setOptions(next);
+            remember(container, next);
+          }}
         />
       </label>
 
@@ -230,6 +273,11 @@ export function RecordingSetup() {
         <X aria-hidden="true" size={18} strokeWidth={2} />
       </button>
       {error && <div className="recording-setup-error">{error}</div>}
+      {formatNote && !error && (
+        <div className="recording-setup-note" role="status">
+          {formatNote}
+        </div>
+      )}
     </main>
   );
 }

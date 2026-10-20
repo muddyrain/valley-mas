@@ -2,12 +2,14 @@ import {
   ArrowUpRight,
   Check,
   Circle,
+  CopyCheck,
   Download,
   Grid3X3,
   Move,
   PenLine,
   Pin,
   Pipette,
+  Redo2,
   ScanLine,
   Square,
   Type,
@@ -36,8 +38,10 @@ import {
   resizeTextAnnotation,
   undoAnnotation,
 } from './core/annotation';
+import type { AnnotationPreferences } from './core/capture-preferences';
 import { colorFormatForShift, formatPickedColor, type RgbColor, rgbToHex } from './core/color';
 import type { Point, Rectangle } from './core/geometry';
+import { getScreenshotCommand, type ScreenshotOutputAction } from './core/screenshot-command';
 import { getScreenshotToolbarPosition } from './core/screenshot-toolbar';
 import { adjustSelection, type SelectionHandle } from './core/selection-adjustment';
 import { createSelectionMaskRects } from './core/selection-mask';
@@ -132,6 +136,16 @@ export function ScreenshotEditor({
     | undefined
   >(undefined);
   const historyRef = useRef<AnnotationAction[]>([]);
+  const redoRef = useRef<AnnotationAction[]>([]);
+  const [redoCount, setRedoCount] = useState(0);
+  const exportWorkingRef = useRef(false);
+  const annotationPreferencesRef = useRef<AnnotationPreferences>({
+    color: '#2563eb',
+    strokeWidth: 4,
+    mosaicSize: 16,
+    textScale: 1,
+  });
+  const [stylesReady, setStylesReady] = useState(false);
   const [plan, setPlan] = useState<ScreenshotEditPlan>();
   const [selectionPreview, setSelectionPreview] = useState<Rectangle>();
   const [selectionMoving, setSelectionMoving] = useState(false);
@@ -149,6 +163,10 @@ export function ScreenshotEditor({
   const [selectedTextIndex, setSelectedTextIndex] = useState(-1);
   const [error, setError] = useState<string>();
   const [working, setWorking] = useState(false);
+  const setWorkingState = (value: boolean) => {
+    exportWorkingRef.current = value;
+    setWorking(value);
+  };
   const [longScreenshotStarting, setLongScreenshotStarting] = useState(false);
   const [pickedColor, setPickedColor] = useState<{
     color: RgbColor;
@@ -224,20 +242,35 @@ export function ScreenshotEditor({
   }, [textInput]);
 
   useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && plan) {
-        void window.screenRecorder.cancelScreenshotEdit(plan.operationId);
-      }
-      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'z') {
-        event.preventDefault();
-        const next = undoAnnotation(historyRef.current);
-        historyRef.current = next;
-        setHistory(next);
-      }
+    let active = true;
+    void window.screenRecorder
+      .getCapturePreferences()
+      .then(({ annotation }) => {
+        if (!active) return;
+        annotationPreferencesRef.current = annotation;
+        setColor(annotation.color);
+        setStrokeWidth(annotation.strokeWidth);
+        setMosaicSize(annotation.mosaicSize);
+        setTextScale(annotation.textScale);
+        setStylesReady(true);
+      })
+      .catch((caught) => setError(caught instanceof Error ? caught.message : '无法读取标注偏好'));
+    return () => {
+      active = false;
     };
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, [plan]);
+  }, []);
+
+  const rememberAnnotation = (patch: Partial<AnnotationPreferences>) => {
+    const preferences = { ...annotationPreferencesRef.current, ...patch };
+    annotationPreferencesRef.current = preferences;
+    if (patch.color !== undefined) setColor(patch.color);
+    if (patch.strokeWidth !== undefined) setStrokeWidth(patch.strokeWidth);
+    if (patch.mosaicSize !== undefined) setMosaicSize(patch.mosaicSize);
+    if (patch.textScale !== undefined) setTextScale(patch.textScale);
+    void window.screenRecorder
+      .updateAnnotationPreferences(preferences)
+      .catch((caught) => setError(caught instanceof Error ? caught.message : '无法保存标注偏好'));
+  };
 
   const pointFromEvent = (event: React.PointerEvent<HTMLCanvasElement>): Point => {
     const rect = event.currentTarget.getBoundingClientRect();
@@ -301,7 +334,7 @@ export function ScreenshotEditor({
     const selectionMove = selectionMoveRef.current;
     if (!selectionMove || !plan) return;
     selectionMoveRef.current = undefined;
-    setWorking(true);
+    setWorkingState(true);
     try {
       const nextPlan = await window.screenRecorder.updateScreenshotSelection(
         plan.operationId,
@@ -312,6 +345,7 @@ export function ScreenshotEditor({
         plan.sourceRect,
         nextPlan.sourceRect,
       );
+      redoRef.current = rebaseAnnotations(redoRef.current, plan.sourceRect, nextPlan.sourceRect);
       historyRef.current = nextHistory;
       setHistory(nextHistory);
       await applyEditPlan(nextPlan);
@@ -322,7 +356,7 @@ export function ScreenshotEditor({
       setError(caught instanceof Error ? caught.message : '无法调整截图选区');
     } finally {
       setSelectionMoving(false);
-      setWorking(false);
+      setWorkingState(false);
     }
   };
 
@@ -357,7 +391,7 @@ export function ScreenshotEditor({
           size: measureTextAnnotation(action),
         };
         setSelectedTextIndex(textIndex);
-        setTextScale(action.fontScale);
+        rememberAnnotation({ textScale: action.fontScale });
         setStylePopoverTool('text');
         setTextHovering(true);
         setMovingText(true);
@@ -406,8 +440,7 @@ export function ScreenshotEditor({
         { width: canvas.width, height: canvas.height },
       );
       const next = moveTextAnnotation(historyRef.current, textDrag.index, at);
-      historyRef.current = next;
-      setHistory(next);
+      commitHistory(next);
       return;
     }
     if (tool === 'text' && !startRef.current) {
@@ -442,8 +475,7 @@ export function ScreenshotEditor({
     selectionMoveRef.current = undefined;
     if (!draft) return;
     const next = addAnnotation(historyRef.current, draft);
-    historyRef.current = next;
-    setHistory(next);
+    commitHistory(next);
     setDraft(undefined);
   };
 
@@ -464,14 +496,34 @@ export function ScreenshotEditor({
       : undefined;
     if (action) {
       const next = addAnnotation(historyRef.current, action);
-      historyRef.current = next;
-      setHistory(next);
+      commitHistory(next);
     }
     setTextInput(undefined);
   };
 
+  const commitHistory = (next: AnnotationAction[]) => {
+    redoRef.current = [];
+    setRedoCount(0);
+    historyRef.current = next;
+    setHistory(next);
+  };
+
   const undo = () => {
+    const last = historyRef.current.at(-1);
+    if (!last) return;
+    redoRef.current = [last, ...redoRef.current];
+    setRedoCount(redoRef.current.length);
     const next = undoAnnotation(historyRef.current);
+    historyRef.current = next;
+    setHistory(next);
+  };
+
+  const redo = () => {
+    const [action, ...remaining] = redoRef.current;
+    if (!action) return;
+    redoRef.current = remaining;
+    setRedoCount(remaining.length);
+    const next = addAnnotation(historyRef.current, action);
     historyRef.current = next;
     setHistory(next);
   };
@@ -483,8 +535,7 @@ export function ScreenshotEditor({
       : undefined;
     if (textAction) {
       actions = addAnnotation(actions, textAction);
-      historyRef.current = actions;
-      setHistory(actions);
+      commitHistory(actions);
     }
     if (textInput) setTextInput(undefined);
     redraw(actions, undefined);
@@ -499,52 +550,71 @@ export function ScreenshotEditor({
     return blob.arrayBuffer();
   };
 
-  const save = async (choosePath = false) => {
-    if (!plan) return;
-    setWorking(true);
+  const save = async (action: ScreenshotOutputAction) => {
+    if (!plan || exportWorkingRef.current) return;
+    setWorkingState(true);
     setError(undefined);
     try {
       await prepareAnnotationsForExport();
       const png = await createPng();
-      if (choosePath) {
+      if (action === 'copy') {
+        await window.screenRecorder.copyScreenshot(plan.operationId, png);
+      } else if (action === 'save') {
         const result = await window.screenRecorder.saveScreenshotAs(plan.operationId, png);
-        if (!result.saved) setWorking(false);
+        if (!result.saved) setWorkingState(false);
       } else {
         await window.screenRecorder.saveScreenshot(plan.operationId, png);
       }
     } catch (caught) {
-      setWorking(false);
+      setWorkingState(false);
       setError(caught instanceof Error ? caught.message : '无法保存截图');
     }
   };
 
   const startLongScreenshot = async () => {
-    if (!plan) return;
-    setWorking(true);
+    if (!plan || exportWorkingRef.current) return;
+    setWorkingState(true);
     setLongScreenshotStarting(true);
     setError(undefined);
     try {
       await prepareAnnotationsForExport();
       await window.screenRecorder.startLongScreenshot(plan.operationId, await createPng());
     } catch (caught) {
-      setWorking(false);
+      setWorkingState(false);
       setLongScreenshotStarting(false);
       setError(caught instanceof Error ? caught.message : '无法开始长截图');
     }
   };
 
   const pinScreenshot = async () => {
-    if (!plan) return;
-    setWorking(true);
+    if (!plan || exportWorkingRef.current) return;
+    setWorkingState(true);
     setError(undefined);
     try {
       await prepareAnnotationsForExport();
       await window.screenRecorder.pinScreenshot(plan.operationId, await createPng());
     } catch (caught) {
-      setWorking(false);
+      setWorkingState(false);
       setError(caught instanceof Error ? caught.message : '无法固定截图');
     }
   };
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      const editing =
+        event.target instanceof Element &&
+        Boolean(event.target.closest('input, textarea, [contenteditable="true"]'));
+      const command = getScreenshotCommand(event, editing);
+      if (!command || event.repeat || exportWorkingRef.current || !plan) return;
+      event.preventDefault();
+      if (command === 'cancel') void window.screenRecorder.cancelScreenshotEdit(plan.operationId);
+      else if (command === 'undo') undo();
+      else if (command === 'redo') redo();
+      else void save(command);
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  });
 
   if (!plan) {
     return visible ? (
@@ -646,6 +716,8 @@ export function ScreenshotEditor({
             onChange={(event) => setTextInput({ ...textInput, value: event.target.value })}
             onBlur={commitText}
             onKeyDown={(event) => {
+              if (event.nativeEvent.isComposing) return;
+              if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 's') return;
               event.stopPropagation();
               if (event.key === 'Enter') event.currentTarget.blur();
               if (event.key === 'Escape') setTextInput(undefined);
@@ -708,6 +780,7 @@ export function ScreenshotEditor({
             key={value}
             tooltip={label}
             aria-label={label}
+            disabled={working || !stylesReady}
             className={tool === value ? 'screenshot-tool-active' : undefined}
             onClick={() => {
               setTool(value);
@@ -780,26 +853,27 @@ export function ScreenshotEditor({
                 1) *
               42
             }
-            onColorChange={setColor}
-            onStrokeWidthChange={setStrokeWidth}
+            onColorChange={(value) => rememberAnnotation({ color: value })}
+            onStrokeWidthChange={(value) => rememberAnnotation({ strokeWidth: value })}
             onSizeChange={(value) => {
               if (stylePopoverTool === 'mosaic') {
-                setMosaicSize(value as AnnotationMosaicSize);
+                rememberAnnotation({ mosaicSize: value as AnnotationMosaicSize });
                 return;
               }
               if (stylePopoverTool === 'text') {
                 const nextScale = value as AnnotationTextScale;
-                setTextScale(nextScale);
+                rememberAnnotation({ textScale: nextScale });
                 if (selectedTextIndex >= 0) {
                   const next = resizeTextAnnotation(
                     historyRef.current,
                     selectedTextIndex,
                     nextScale,
                   );
-                  historyRef.current = next;
-                  setHistory(next);
+                  commitHistory(next);
                 }
+                return;
               }
+              rememberAnnotation({ strokeWidth: value as AnnotationStrokeWidth });
             }}
           />
         )}
@@ -815,10 +889,18 @@ export function ScreenshotEditor({
         <ToolbarButton
           tooltip="撤销"
           aria-label="撤销"
-          disabled={history.length === 0}
+          disabled={working || history.length === 0}
           onClick={undo}
         >
           <Undo2 aria-hidden="true" size={19} strokeWidth={1.8} />
+        </ToolbarButton>
+        <ToolbarButton
+          tooltip="重做（⌘⇧Z）"
+          aria-label="重做"
+          disabled={working || redoCount === 0}
+          onClick={redo}
+        >
+          <Redo2 aria-hidden="true" size={19} strokeWidth={1.8} />
         </ToolbarButton>
         <ToolbarButton
           tooltip="长截图"
@@ -829,12 +911,20 @@ export function ScreenshotEditor({
           <ScanLine aria-hidden="true" size={19} strokeWidth={1.8} />
         </ToolbarButton>
         <ToolbarButton
-          tooltip="另存为 PNG"
+          tooltip="保存 PNG（⌘S）"
           aria-label="保存截图文件"
           disabled={working}
-          onClick={() => void save(true)}
+          onClick={() => void save('save')}
         >
           <Download aria-hidden="true" size={19} strokeWidth={1.8} />
+        </ToolbarButton>
+        <ToolbarButton
+          tooltip="保存到默认目录并复制"
+          aria-label="保存并复制截图"
+          disabled={working}
+          onClick={() => void save('copy-and-save')}
+        >
+          <CopyCheck aria-hidden="true" size={19} strokeWidth={1.8} />
         </ToolbarButton>
         <ToolbarButton
           tooltip="取消"
@@ -844,10 +934,10 @@ export function ScreenshotEditor({
           <X aria-hidden="true" size={20} strokeWidth={1.8} />
         </ToolbarButton>
         <ToolbarButton
-          tooltip="完成并复制"
-          aria-label="保存并复制截图"
+          tooltip="复制并完成（Enter / ⌘C）"
+          aria-label="复制截图"
           disabled={working}
-          onClick={() => void save()}
+          onClick={() => void save('copy')}
         >
           <Check aria-hidden="true" size={20} strokeWidth={2} />
         </ToolbarButton>

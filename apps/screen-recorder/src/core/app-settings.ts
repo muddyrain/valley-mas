@@ -1,6 +1,9 @@
+import { type CapturePreferences, parseCapturePreferences } from './capture-preferences';
+
 export type PersistedAppSettings = {
   recordingDirectory?: string;
   notificationsEnabled: boolean;
+  capturePreferences?: CapturePreferences;
 };
 
 export type LoginItemTarget = {
@@ -21,10 +24,14 @@ export function getLoginItemTarget(
 export function parsePersistedAppSettings(
   value: unknown,
   isAbsolute: (value: string) => boolean,
+  platform: NodeJS.Platform = process.platform,
 ): PersistedAppSettings {
   if (!value || typeof value !== 'object') return { notificationsEnabled: false };
   const source = value as Record<string, unknown>;
   const notificationsEnabled = source.notificationsEnabled === true;
+  const preferences = source.capturePreferences
+    ? { capturePreferences: parseCapturePreferences(source.capturePreferences, platform) }
+    : {};
   const recordingDirectory = source.recordingDirectory;
   if (
     typeof recordingDirectory !== 'string' ||
@@ -33,7 +40,7 @@ export function parsePersistedAppSettings(
     recordingDirectory.includes('\0') ||
     !isAbsolute(recordingDirectory)
   ) {
-    return { notificationsEnabled };
+    return { notificationsEnabled, ...preferences };
   }
-  return { recordingDirectory, notificationsEnabled };
+  return { recordingDirectory, notificationsEnabled, ...preferences };
 }

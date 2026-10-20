@@ -1205,7 +1205,9 @@ button:active:not(:disabled) {
   display: flex;
   align-items: center;
   gap: 2px;
-  height: 48px;
+  width: min(695px, calc(100vw - 24px));
+  min-height: 48px;
+  flex-wrap: wrap;
   padding: 4px 7px;
   border-radius: 11px;
   background: #fff;
@@ -1215,6 +1217,7 @@ button:active:not(:disabled) {
 }
 
 .screenshot-toolbar button {
+  flex-shrink: 0;
   display: grid;
   place-items: center;
   width: 40px;
@@ -1540,7 +1543,7 @@ button:active:not(:disabled) {
 
 @media (max-width: 210px) {
   .long-screenshot-control button {
-    width: 38px;
+    width: calc((100vw - 40px) / 4);
   }
 }
 
@@ -1918,6 +1921,15 @@ button:active:not(:disabled) {
   font-size: 10px;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.recording-setup-note {
+  position: absolute;
+  right: 18px;
+  bottom: 8px;
+  left: 18px;
+  color: #64748b;
+  font-size: 10px;
 }
 
 .recording-completion-card {

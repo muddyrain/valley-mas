@@ -276,8 +276,7 @@ app.whenReady().then(async () => {
       );
     }
     results.exportSize = exported.getSize();
-    await until(() => copiedImage);
-    assert.deepEqual(copiedImage.getSize(), exported.getSize());
+    assert.equal(copiedImage, undefined, 'Save-only export changed the clipboard');
     assert.equal(results.captures.length, capturesBeforeSwitch, 'Editing recaptured the desktop');
 
     // Begin directly in recording mode, switch to screenshot, and cancel without output.

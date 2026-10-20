@@ -25,6 +25,11 @@ import {
 } from 'electron';
 import { restartApplication } from '../src/core/app-restart';
 import { getLoginItemTarget, parsePersistedAppSettings } from '../src/core/app-settings';
+import {
+  type CapturePreferences,
+  getDefaultCapturePreferences,
+  parseAnnotationPreferences,
+} from '../src/core/capture-preferences';
 import { isSupportedColorText } from '../src/core/color';
 import { createScreenshotFilename, ensurePngExtension } from '../src/core/filename';
 import {
@@ -102,6 +107,7 @@ import {
   type ScreenCapturePermissionStatus,
   shouldOfferScreenCapturePermissionRecovery,
 } from '../src/core/screen-capture-permission';
+import type { ScreenshotOutputAction } from '../src/core/screenshot-command';
 import { canRevealScreenshotEditor } from '../src/core/screenshot-handoff';
 import { type ScreenshotMode, ScreenshotSession } from '../src/core/screenshot-state';
 import { findSelectionDisplayChange } from '../src/core/selection-display';
@@ -113,6 +119,7 @@ import {
 } from '../src/core/shortcuts';
 import { createSecondInstanceActivation } from '../src/core/single-instance';
 import { createTrayPrimaryAction } from '../src/core/tray-action';
+import { getTrayRecordingStatus } from '../src/core/tray-status';
 import { shouldProtectWindowContent } from '../src/core/window-content-protection';
 import { scheduleWindowDestroy } from '../src/core/window-lifecycle';
 import {
@@ -227,6 +234,9 @@ let pendingRecording:
 let shortcutSettings: ShortcutSettings = { ...DEFAULT_SHORTCUTS };
 let shortcutCaptureActive = false;
 let notificationsEnabled = false;
+let capturePreferences = getDefaultCapturePreferences(process.platform);
+let appSettingsWriteQueue: Promise<void> = Promise.resolve();
+let trayStatusTimer: NodeJS.Timeout | undefined;
 let windowTargetsPromise: Promise<WindowTarget[]> | undefined;
 let trayMenu: Menu | undefined;
 type PinnedScreenshotEntry = {
@@ -1712,24 +1722,33 @@ async function copyScreenshot(png: Uint8Array): Promise<void> {
   screenshotCopiedToClipboard = true;
 }
 
-async function persistCompletedScreenshot(png: Uint8Array, requestedPath?: string): Promise<void> {
-  screenshotOutputPath = await writeScreenshotPng(png, requestedPath);
-  try {
-    await copyScreenshot(png);
-  } catch (clipboardError) {
-    screenshotCopiedToClipboard = false;
-    warningMessage = `截图已保存，但复制到剪贴板失败：${clipboardError instanceof Error ? clipboardError.message : '未知错误'}`;
-  }
+function completeScreenshotTask(): void {
   screenshotSession.complete();
-  notify(
-    '截图已保存',
-    screenshotCopiedToClipboard ? `${screenshotOutputPath}\n已复制到剪贴板` : screenshotOutputPath,
-  );
   screenshotTask = undefined;
   screenshotSourcePromise = undefined;
   screenshotDisplayImage = undefined;
   screenshotEditPlan = undefined;
   errorMessage = undefined;
+}
+
+async function persistCompletedScreenshot(
+  png: Uint8Array,
+  requestedPath?: string,
+  copyToClipboard = true,
+): Promise<void> {
+  screenshotOutputPath = await writeScreenshotPng(png, requestedPath);
+  screenshotCopiedToClipboard = false;
+  try {
+    if (copyToClipboard) await copyScreenshot(png);
+  } catch (clipboardError) {
+    screenshotCopiedToClipboard = false;
+    warningMessage = `截图已保存，但复制到剪贴板失败：${clipboardError instanceof Error ? clipboardError.message : '未知错误'}`;
+  }
+  completeScreenshotTask();
+  notify(
+    '截图已保存',
+    screenshotCopiedToClipboard ? `${screenshotOutputPath}\n已复制到剪贴板` : screenshotOutputPath,
+  );
 }
 
 async function captureLongScreenshotFrame(): Promise<void> {
@@ -1925,12 +1944,14 @@ async function startLongScreenshot(operationId: string, firstPng: Uint8Array): P
   }
 }
 
-async function finishLongScreenshot(): Promise<void> {
+async function finishLongScreenshot(action: ScreenshotOutputAction = 'copy'): Promise<void> {
   const capture = longScreenshotCapture;
   if (!capture || screenshotSession.state !== 'long-capturing') {
     throw new Error('长截图任务已失效');
   }
+  const wasSampling = Boolean(capture.timer);
   if (capture.timer) clearInterval(capture.timer);
+  capture.timer = undefined;
   while (capture.sampling) await new Promise((resolve) => setTimeout(resolve, 20));
   await captureLongScreenshotFrame();
   try {
@@ -1942,13 +1963,29 @@ async function finishLongScreenshot(): Promise<void> {
     });
     if (image.isEmpty()) throw new Error('无法生成长截图');
     const png = image.toPNG();
-    await copyScreenshot(png);
     screenshotOutputPath = undefined;
-    screenshotSession.complete();
-    screenshotTask = undefined;
-    screenshotSourcePromise = undefined;
-    screenshotDisplayImage = undefined;
-    screenshotEditPlan = undefined;
+    screenshotCopiedToClipboard = false;
+    if (action === 'save') {
+      disposeLongScreenshotEscape?.();
+      disposeLongScreenshotEscape = undefined;
+    }
+    const requestedPath =
+      action === 'save' ? await chooseScreenshotSavePath(longScreenshotControlWindow) : undefined;
+    if (longScreenshotCapture !== capture) return;
+    if (action === 'save' && !requestedPath) {
+      disposeLongScreenshotEscape = registerLongScreenshotEscape(globalShortcut, () =>
+        cancelLongScreenshot(),
+      );
+      if (wasSampling)
+        capture.timer = setInterval(
+          () => void captureLongScreenshotFrame(),
+          LONG_SCREENSHOT_SAMPLE_INTERVAL_MS,
+        );
+      return;
+    }
+    if (action !== 'copy') screenshotOutputPath = await writeScreenshotPng(png, requestedPath);
+    if (action !== 'save') await copyScreenshot(png);
+    completeScreenshotTask();
     warningMessage = undefined;
     errorMessage = undefined;
     clearLongScreenshotCapture();
@@ -1957,7 +1994,12 @@ async function finishLongScreenshot(): Promise<void> {
     destroyScreenshotEditorWindow();
     broadcast();
   } catch (error) {
-    errorMessage = `无法复制长截图：${error instanceof Error ? error.message : '未知错误'}`;
+    errorMessage = `无法完成长截图：${error instanceof Error ? error.message : '未知错误'}`;
+    if (longScreenshotCapture === capture && !disposeLongScreenshotEscape) {
+      disposeLongScreenshotEscape = registerLongScreenshotEscape(globalShortcut, () =>
+        cancelLongScreenshot(),
+      );
+    }
     updateLongScreenshotNotice(capture, `${errorMessage}，可重试完成或取消`);
     notify('长截图失败', errorMessage);
     broadcast();
@@ -2101,8 +2143,8 @@ async function beginRecording(mode: 'screen' | 'region'): Promise<void> {
         'screen',
         display,
         undefined,
-        'webm',
-        getDefaultRecordingOptions(process.platform),
+        capturePreferences.recording.container,
+        capturePreferences.recording.options,
       );
       createIndicatorWindow(display);
       createRecordingSetupWindow(display);
@@ -2271,7 +2313,7 @@ function createPlan(
   mode: 'screen' | 'region',
   display: Display,
   selection?: Rectangle,
-  container: RecordingContainer = 'webm',
+  container: RecordingContainer = capturePreferences.recording.container,
   options = getDefaultRecordingOptions(process.platform),
 ): CapturePlan {
   return {
@@ -2408,13 +2450,19 @@ function getAutoLaunchEnabled(): boolean {
   return app.getLoginItemSettings(getLoginItemOptions()).openAtLogin;
 }
 
-async function persistAppSettings(): Promise<void> {
+function persistAppSettings(): Promise<void> {
+  const pending = appSettingsWriteQueue.catch(() => undefined).then(writeAppSettings);
+  appSettingsWriteQueue = pending;
+  return pending;
+}
+
+async function writeAppSettings(): Promise<void> {
   await mkdir(path.dirname(appSettingsPath), { recursive: true });
   const temporaryPath = `${appSettingsPath}.part-${randomUUID()}`;
   try {
     await writeFile(
       temporaryPath,
-      `${JSON.stringify({ recordingDirectory: saveDirectory, notificationsEnabled }, null, 2)}\n`,
+      `${JSON.stringify({ recordingDirectory: saveDirectory, notificationsEnabled, capturePreferences }, null, 2)}\n`,
       { flag: 'wx' },
     );
     await rename(temporaryPath, appSettingsPath);
@@ -2433,6 +2481,7 @@ async function loadAppSettings(): Promise<void> {
       fileWriter.setSaveDirectory(saveDirectory);
     }
     notificationsEnabled = settings.notificationsEnabled;
+    if (settings.capturePreferences) capturePreferences = settings.capturePreferences;
   } catch (error) {
     const code = error && typeof error === 'object' && 'code' in error ? error.code : undefined;
     if (code !== 'ENOENT') {
@@ -2530,11 +2579,34 @@ async function updateShortcutSettings(value: unknown): Promise<void> {
   }
 }
 
+function updateTrayStatus(): void {
+  if (!tray) return;
+  const view = getTrayRecordingStatus(
+    recorderSession.state,
+    startedAt,
+    activePlan?.countdownEndsAt,
+  );
+  if (process.platform === 'darwin') tray.setTitle(view.title, { fontType: 'monospacedDigit' });
+  tray.setToolTip(view.tooltip);
+  const ticking = recorderSession.state === 'countdown' || recorderSession.state === 'recording';
+  if (ticking && !trayStatusTimer) trayStatusTimer = setInterval(updateTrayStatus, 1000);
+  if (!ticking && trayStatusTimer) {
+    clearInterval(trayStatusTimer);
+    trayStatusTimer = undefined;
+  }
+}
+
 function rebuildTrayMenu(): void {
   if (!tray) {
     return;
   }
   const template: MenuItemConstructorOptions[] = [
+    {
+      label: getTrayRecordingStatus(recorderSession.state, startedAt, activePlan?.countdownEndsAt)
+        .label,
+      enabled: false,
+    },
+    { type: 'separator' },
     { label: '快捷键设置', click: showMainWindow },
     { type: 'separator' },
     {
@@ -2576,6 +2648,7 @@ function rebuildTrayMenu(): void {
   ];
   trayMenu = Menu.buildFromTemplate(template);
   tray.setContextMenu(process.platform === 'darwin' ? null : trayMenu);
+  updateTrayStatus();
 }
 
 function createTray(): void {
@@ -2589,10 +2662,17 @@ function createTray(): void {
   tray.setToolTip('Valley Screen Recorder');
   tray.on(
     'click',
-    createTrayPrimaryAction(() => beginScreenshot('region'), handleShortcutError),
+    createTrayPrimaryAction(() => beginScreenshot('region'), handleShortcutError, {
+      isBusy: () => isRecordingBusy() || isScreenshotBusy(),
+      showMenu: () => {
+        rebuildTrayMenu();
+        if (trayMenu) tray?.popUpContextMenu(trayMenu);
+      },
+    }),
   );
   if (process.platform === 'darwin') {
     tray.on('right-click', () => {
+      rebuildTrayMenu();
       if (trayMenu) tray?.popUpContextMenu(trayMenu);
     });
   }
@@ -2600,6 +2680,64 @@ function createTray(): void {
 }
 
 function registerIpc(): void {
+  const assertPreferencesSender = (event: IpcMainInvokeEvent) => {
+    if (
+      !isAllowedIpcSender(event.sender.id, [
+        mainWindow?.webContents.id,
+        selectionWindow?.webContents.id,
+        screenshotEditorWindow?.webContents.id,
+        recordingSetupWindow?.webContents.id,
+      ])
+    ) {
+      throw new Error('偏好设置 IPC 调用来源无效');
+    }
+  };
+  ipcMain.handle(IPC_CHANNELS.getCapturePreferences, (event) => {
+    assertPreferencesSender(event);
+    return capturePreferences;
+  });
+  const updatePreferences = async (next: CapturePreferences) => {
+    const previous = capturePreferences;
+    capturePreferences = next;
+    try {
+      await persistAppSettings();
+    } catch (error) {
+      if (capturePreferences === next) capturePreferences = previous;
+      throw error;
+    }
+  };
+  ipcMain.handle(IPC_CHANNELS.updateRecordingPreferences, async (event, value: unknown) => {
+    assertRecordingConfigurationSender(event);
+    await updatePreferences({
+      ...capturePreferences,
+      recording: parseRecordingConfiguration(value, process.platform),
+    });
+  });
+  ipcMain.handle(IPC_CHANNELS.updateAnnotationPreferences, async (event, value: unknown) => {
+    assertScreenshotEditorSender(event);
+    await updatePreferences({
+      ...capturePreferences,
+      annotation: parseAnnotationPreferences(value),
+    });
+  });
+  ipcMain.handle(IPC_CHANNELS.copyScreenshot, async (event, operationId: unknown, png: unknown) => {
+    assertScreenshotEditorSender(event);
+    assertString(operationId, '截图操作 ID');
+    if (
+      !screenshotEditPlan ||
+      screenshotEditPlan.operationId !== operationId ||
+      screenshotSession.state !== 'editing'
+    ) {
+      throw new Error('截图编辑任务已失效');
+    }
+    if (!(png instanceof ArrayBuffer) || !isValidPng(new Uint8Array(png)))
+      throw new Error('截图数据格式无效');
+    await copyScreenshot(new Uint8Array(png));
+    screenshotOutputPath = undefined;
+    completeScreenshotTask();
+    setImmediate(destroyScreenshotEditorWindow);
+    broadcast();
+  });
   ipcMain.on(IPC_CHANNELS.selectionReady, (event) => {
     if (
       !selectionWindow ||
@@ -2758,14 +2896,8 @@ function registerIpc(): void {
       setImmediate(destroyScreenshotEditorWindow);
       broadcast();
     } catch (error) {
-      screenshotSession.fail();
-      screenshotTask = undefined;
-      screenshotSourcePromise = undefined;
-      screenshotDisplayImage = undefined;
-      screenshotEditPlan = undefined;
       errorMessage = `无法保存截图：${error instanceof Error ? error.message : '未知错误'}`;
       notify('截图失败', errorMessage);
-      setImmediate(destroyScreenshotEditorWindow);
       broadcast();
       throw error;
     }
@@ -2787,7 +2919,7 @@ function registerIpc(): void {
       const targetPath = await chooseScreenshotSavePath();
       if (!targetPath) return { saved: false };
       try {
-        await persistCompletedScreenshot(new Uint8Array(png), targetPath);
+        await persistCompletedScreenshot(new Uint8Array(png), targetPath, false);
         setImmediate(destroyScreenshotEditorWindow);
         broadcast();
         return { saved: true };
@@ -2810,9 +2942,16 @@ function registerIpc(): void {
     },
   );
 
-  ipcMain.handle(IPC_CHANNELS.finishLongScreenshot, async (event) => {
+  ipcMain.handle(IPC_CHANNELS.finishLongScreenshot, async (event, action: unknown) => {
     assertLongScreenshotControlSender(event);
-    await finishLongScreenshot();
+    if (
+      action !== undefined &&
+      action !== 'copy' &&
+      action !== 'save' &&
+      action !== 'copy-and-save'
+    )
+      throw new Error('长截图输出操作无效');
+    await finishLongScreenshot(action);
   });
 
   ipcMain.handle(IPC_CHANNELS.cancelLongScreenshot, (event) => {
@@ -3256,6 +3395,7 @@ app.on('window-all-closed', () => {
 });
 
 app.on('before-quit', () => {
+  if (trayStatusTimer) clearInterval(trayStatusTimer);
   isQuitting = true;
   stopSelectionDisplayWatcher();
   clearLongScreenshotCapture();

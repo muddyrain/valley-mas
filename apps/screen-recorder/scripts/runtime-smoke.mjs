@@ -1933,7 +1933,8 @@ async function runCoreScenarios() {
           value?.visible &&
           value.images === 1 &&
           value.viewport?.height > 100 &&
-          value.actions?.join(',') === '取消长截图,完成并复制长截图',
+          value.actions?.join(',') ===
+            '取消长截图,保存长截图文件,保存并复制长截图,完成并复制长截图',
       );
       console.error('[runtime] long screenshot initial preview ready');
       await control.evaluate(`(() => {

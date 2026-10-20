@@ -8,7 +8,7 @@ describe('screenshot toolbar position', () => {
         { x: 900, y: 700, width: 400, height: 180 },
         { width: 1440, height: 900 },
       ),
-    ).toEqual({ left: 689, top: 640 });
+    ).toEqual({ left: 605, top: 640 });
   });
 
   it('keeps the right-aligned toolbar inside the viewport', () => {
@@ -17,6 +17,6 @@ describe('screenshot toolbar position', () => {
         { x: 1_300, y: 80, width: 300, height: 200 },
         { width: 1440, height: 900 },
       ),
-    ).toEqual({ left: 817, top: 292 });
+    ).toEqual({ left: 733, top: 292 });
   });
 });

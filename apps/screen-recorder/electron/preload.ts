@@ -1,6 +1,8 @@
 import { contextBridge, ipcRenderer } from 'electron';
+import type { AnnotationPreferences } from '../src/core/capture-preferences';
 import type { Rectangle } from '../src/core/geometry';
 import type { RecordingConfiguration } from '../src/core/recording-options';
+import type { ScreenshotOutputAction } from '../src/core/screenshot-command';
 import type { ScreenshotMode } from '../src/core/screenshot-state';
 import type { RecordingMode } from '../src/core/session';
 import type { ShortcutSettings } from '../src/core/shortcuts';
@@ -25,11 +27,19 @@ const api: RecorderApi = {
   closePinnedScreenshot: () => ipcRenderer.invoke(IPC_CHANNELS.closePinnedScreenshot),
   saveScreenshot: (operationId: string, png: ArrayBuffer) =>
     ipcRenderer.invoke(IPC_CHANNELS.saveScreenshot, operationId, png),
+  copyScreenshot: (operationId: string, png: ArrayBuffer) =>
+    ipcRenderer.invoke(IPC_CHANNELS.copyScreenshot, operationId, png),
+  getCapturePreferences: () => ipcRenderer.invoke(IPC_CHANNELS.getCapturePreferences),
+  updateRecordingPreferences: (configuration: RecordingConfiguration) =>
+    ipcRenderer.invoke(IPC_CHANNELS.updateRecordingPreferences, configuration),
+  updateAnnotationPreferences: (preferences: AnnotationPreferences) =>
+    ipcRenderer.invoke(IPC_CHANNELS.updateAnnotationPreferences, preferences),
   saveScreenshotAs: (operationId: string, png: ArrayBuffer) =>
     ipcRenderer.invoke(IPC_CHANNELS.saveScreenshotAs, operationId, png),
   startLongScreenshot: (operationId: string, firstFrame: ArrayBuffer) =>
     ipcRenderer.invoke(IPC_CHANNELS.startLongScreenshot, operationId, firstFrame),
-  finishLongScreenshot: () => ipcRenderer.invoke(IPC_CHANNELS.finishLongScreenshot),
+  finishLongScreenshot: (action?: ScreenshotOutputAction) =>
+    ipcRenderer.invoke(IPC_CHANNELS.finishLongScreenshot, action),
   cancelLongScreenshot: () => ipcRenderer.invoke(IPC_CHANNELS.cancelLongScreenshot),
   cancelScreenshotEdit: (operationId: string) =>
     ipcRenderer.invoke(IPC_CHANNELS.cancelScreenshotEdit, operationId),

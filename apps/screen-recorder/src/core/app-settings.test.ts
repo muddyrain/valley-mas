@@ -1,7 +1,26 @@
 import { describe, expect, it } from 'vitest';
 import { getLoginItemTarget, parsePersistedAppSettings } from './app-settings';
+import { getDefaultCapturePreferences } from './capture-preferences';
 
 describe('persisted screen recorder settings', () => {
+  it('loads new preferences alongside legacy settings without dropping either', () => {
+    const capturePreferences = getDefaultCapturePreferences('darwin');
+    capturePreferences.recording.options.microphone = true;
+    capturePreferences.annotation.mosaicSize = 24;
+    const settings = parsePersistedAppSettings(
+      { recordingDirectory: '/recordings', notificationsEnabled: true, capturePreferences },
+      (value) => value.startsWith('/'),
+      'darwin',
+    );
+    expect(settings).toEqual({
+      recordingDirectory: '/recordings',
+      notificationsEnabled: true,
+      capturePreferences,
+    });
+    expect(
+      parsePersistedAppSettings({ capturePreferences }, () => false, 'darwin').capturePreferences,
+    ).toEqual(capturePreferences);
+  });
   const isAbsolute = (value: string) => /^[A-Z]:\\\\/.test(value);
 
   it('accepts only a bounded absolute recording directory', () => {
