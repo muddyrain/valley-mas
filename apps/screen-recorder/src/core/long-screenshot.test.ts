@@ -10,6 +10,7 @@ import {
   extractLongScreenshotAppendedFrame,
   extractLongScreenshotPrependedFrame,
   getLongScreenshotFrameUpdate,
+  getLongScreenshotMaximumHeight,
   getLongScreenshotNoticeState,
   getVerticalShiftSearchStep,
   type LongScreenshotSlice,
@@ -473,5 +474,16 @@ describe('long screenshot stitching', () => {
     expect(() => composeLongScreenshot([{ frame: frame([10, 20]), appendRows: 30_001 }])).toThrow(
       '过长',
     );
+  });
+
+  it('uses the same pixel budget for sampling and composition at Retina widths', () => {
+    const width = 4096;
+    const maximumHeight = getLongScreenshotMaximumHeight(width);
+    expect(maximumHeight).toBe(16384);
+    expect(getLongScreenshotMaximumHeight(1600)).toBe(30000);
+    const row = { width, height: 1, data: new Uint8Array(width * 4) };
+    const slices = Array.from({ length: maximumHeight + 1 }, () => ({ frame: row, appendRows: 1 }));
+    expect(() => composeLongScreenshot(slices)).toThrow();
+    expect(getLongScreenshotMaximumHeight(width)).toBeLessThan(slices.length);
   });
 });

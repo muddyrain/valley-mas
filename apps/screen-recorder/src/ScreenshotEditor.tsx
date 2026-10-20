@@ -30,9 +30,9 @@ import {
   createMosaicAnnotation,
   createTextAnnotation,
   findTextAnnotationAt,
-  getMosaicBlocks,
   getTextFontSize,
   moveTextAnnotation,
+  rebaseAnnotations,
   resizeTextAnnotation,
   undoAnnotation,
 } from './core/annotation';
@@ -41,6 +41,7 @@ import type { Point, Rectangle } from './core/geometry';
 import { getScreenshotToolbarPosition } from './core/screenshot-toolbar';
 import { adjustSelection, type SelectionHandle } from './core/selection-adjustment';
 import { createSelectionMaskRects } from './core/selection-mask';
+import { ScreenshotCanvasRenderer } from './renderer/screenshot-canvas';
 import { loadScreenshotImage } from './renderer/screenshot-image';
 import type { ScreenshotEditPlan } from './shared/contracts';
 import { useShiftColorFormat } from './useShiftColorFormat';
@@ -92,109 +93,6 @@ function sampleCanvasColor(canvas: HTMLCanvasElement, point: Point): RgbColor | 
   return pixel ? { r: pixel[0], g: pixel[1], b: pixel[2] } : undefined;
 }
 
-function drawLine(ctx: CanvasRenderingContext2D, points: Point[]): void {
-  if (points.length < 2) return;
-  ctx.beginPath();
-  ctx.moveTo(points[0].x, points[0].y);
-  for (const point of points.slice(1)) ctx.lineTo(point.x, point.y);
-  ctx.stroke();
-}
-
-function drawArrow(
-  ctx: CanvasRenderingContext2D,
-  start: Point,
-  end: Point,
-  headSize: number,
-): void {
-  const angle = Math.atan2(end.y - start.y, end.x - start.x);
-  ctx.beginPath();
-  ctx.moveTo(start.x, start.y);
-  ctx.lineTo(end.x, end.y);
-  ctx.lineTo(
-    end.x - headSize * Math.cos(angle - Math.PI / 6),
-    end.y - headSize * Math.sin(angle - Math.PI / 6),
-  );
-  ctx.moveTo(end.x, end.y);
-  ctx.lineTo(
-    end.x - headSize * Math.cos(angle + Math.PI / 6),
-    end.y - headSize * Math.sin(angle + Math.PI / 6),
-  );
-  ctx.stroke();
-}
-
-function renderAction(
-  ctx: CanvasRenderingContext2D,
-  action: AnnotationAction,
-  scale: number,
-): void {
-  ctx.save();
-  if (action.type !== 'mosaic') {
-    ctx.strokeStyle = action.color;
-    ctx.fillStyle = action.color;
-    ctx.lineWidth =
-      action.type === 'text' ? Math.max(2, 3 * scale) : Math.max(1, action.strokeWidth * scale);
-  }
-  ctx.lineCap = 'round';
-  ctx.lineJoin = 'round';
-  if (action.type === 'rectangle') {
-    ctx.strokeRect(
-      action.start.x,
-      action.start.y,
-      action.end.x - action.start.x,
-      action.end.y - action.start.y,
-    );
-  } else if (action.type === 'ellipse') {
-    const centerX = (action.start.x + action.end.x) / 2;
-    const centerY = (action.start.y + action.end.y) / 2;
-    ctx.beginPath();
-    ctx.ellipse(
-      centerX,
-      centerY,
-      Math.abs(action.end.x - action.start.x) / 2,
-      Math.abs(action.end.y - action.start.y) / 2,
-      0,
-      0,
-      Math.PI * 2,
-    );
-    ctx.stroke();
-  } else if (action.type === 'arrow') {
-    drawArrow(ctx, action.start, action.end, Math.max(12, 16 * scale));
-  } else if (action.type === 'pen') {
-    drawLine(ctx, action.points);
-  } else if (action.type === 'mosaic') {
-    const blockSize = Math.max(6, Math.round(action.mosaicSize * scale));
-    const source = ctx.getImageData(0, 0, ctx.canvas.width, ctx.canvas.height);
-    for (const block of getMosaicBlocks(
-      action.points,
-      { width: ctx.canvas.width, height: ctx.canvas.height },
-      blockSize,
-    )) {
-      let red = 0;
-      let green = 0;
-      let blue = 0;
-      let alpha = 0;
-      let samples = 0;
-      for (let y = block.y; y < block.y + block.size; y += 2) {
-        for (let x = block.x; x < block.x + block.size; x += 2) {
-          const offset = (y * source.width + x) * 4;
-          red += source.data[offset];
-          green += source.data[offset + 1];
-          blue += source.data[offset + 2];
-          alpha += source.data[offset + 3];
-          samples += 1;
-        }
-      }
-      ctx.fillStyle = `rgba(${Math.round(red / samples)}, ${Math.round(green / samples)}, ${Math.round(blue / samples)}, ${alpha / samples / 255})`;
-      ctx.fillRect(block.x, block.y, block.size, block.size);
-    }
-  } else if (action.type === 'text') {
-    ctx.font = `${getTextFontSize(scale, action.fontScale)}px "Segoe UI", sans-serif`;
-    ctx.textBaseline = 'top';
-    ctx.fillText(action.text, action.at.x, action.at.y);
-  }
-  ctx.restore();
-}
-
 type ScreenshotEditorProps = {
   visible?: boolean;
   onCanvasReady?: () => void;
@@ -209,6 +107,7 @@ export function ScreenshotEditor({
   onImageReady,
 }: ScreenshotEditorProps = {}) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const canvasRendererRef = useRef(new ScreenshotCanvasRenderer());
   const textInputRef = useRef<HTMLInputElement>(null);
   const imageRef = useRef<HTMLImageElement | undefined>(undefined);
   const revealedRef = useRef(false);
@@ -264,22 +163,14 @@ export function ScreenshotEditor({
       if (!canvas || !image || !plan) return;
       const ctx = canvas.getContext('2d', { willReadFrequently: true });
       if (!ctx) return;
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      const source = plan.sourceRect;
-      ctx.drawImage(
+      canvasRendererRef.current.render(
+        ctx,
         image,
-        source.x,
-        source.y,
-        source.width,
-        source.height,
-        0,
-        0,
-        canvas.width,
-        canvas.height,
+        plan.sourceRect,
+        actions,
+        preview,
+        canvas.width / plan.selection.width,
       );
-      const scale = canvas.width / plan.selection.width;
-      for (const action of actions) renderAction(ctx, action, scale);
-      if (preview) renderAction(ctx, preview, scale);
     },
     [draft, history, plan],
   );
@@ -416,6 +307,13 @@ export function ScreenshotEditor({
         plan.operationId,
         selectionMove.latest,
       );
+      const nextHistory = rebaseAnnotations(
+        historyRef.current,
+        plan.sourceRect,
+        nextPlan.sourceRect,
+      );
+      historyRef.current = nextHistory;
+      setHistory(nextHistory);
       await applyEditPlan(nextPlan);
       setSelectionPreview(undefined);
       setError(undefined);

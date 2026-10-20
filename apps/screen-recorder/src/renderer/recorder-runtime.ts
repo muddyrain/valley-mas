@@ -26,6 +26,7 @@ export class RecorderRuntime {
   private disposed = false;
   private operationId: string | undefined;
   private pendingResources: RecordingResources | undefined;
+  private stopRequested = false;
 
   constructor(
     private readonly api: RecorderApi,
@@ -41,6 +42,7 @@ export class RecorderRuntime {
     const resources = new RecordingResources();
     this.pendingResources = resources;
     this.operationId = plan.operationId;
+    this.stopRequested = false;
     try {
       this.onCountdown(Math.max(0, Math.ceil((plan.countdownEndsAt - Date.now()) / 1000)));
       const confirmedPlan = await this.api.prepareCapture(plan.operationId);
@@ -118,13 +120,18 @@ export class RecorderRuntime {
       this.pendingResources = undefined;
 
       const onData = (event: BlobEvent) => {
-        if (event.data.size === 0) {
+        if (event.data.size === 0 || active.finishing) {
           return;
         }
-        active.writeQueue = active.writeQueue.then(async () => {
-          const chunk = await event.data.arrayBuffer();
-          await this.api.appendChunk(sessionId, chunk);
-        });
+        active.writeQueue = active.writeQueue
+          .then(async () => {
+            if (this.active !== active) return;
+            const chunk = await event.data.arrayBuffer();
+            await this.api.appendChunk(sessionId, chunk);
+          })
+          .catch((error) =>
+            this.abort(active, `无法保存录制文件：${errorText(error, '未知错误')}`),
+          );
       };
       const onStop = () => void this.finish(active);
       const onRecorderError = (event: Event) => {
@@ -144,6 +151,7 @@ export class RecorderRuntime {
         resources.addListener(() => track.removeEventListener('ended', onEnded));
       }
       mediaRecorder.start(1000);
+      if (this.stopRequested) this.requestStop();
     } catch (error) {
       if (!this.isCurrentAttempt(revision, plan.operationId)) {
         resources.cleanup();
@@ -160,6 +168,7 @@ export class RecorderRuntime {
   }
 
   requestStop(): void {
+    if (this.operationId) this.stopRequested = true;
     const recorder = this.active?.mediaRecorder;
     if (!recorder || recorder.state === 'inactive') {
       return;
@@ -392,6 +401,7 @@ export class RecorderRuntime {
     active.finishing = true;
     try {
       await active.writeQueue;
+      if (this.active !== active) return;
       active.resources.cleanup();
       await this.api.finish(active.sessionId);
       this.active = undefined;
@@ -407,6 +417,7 @@ export class RecorderRuntime {
     }
     active.finishing = true;
     active.resources.cleanup();
+    if (active.mediaRecorder.state !== 'inactive') active.mediaRecorder.stop();
     this.active = undefined;
     this.operationId = undefined;
     this.onError(message);

@@ -47,6 +47,7 @@ import {
   extractLongScreenshotAppendedFrame,
   extractLongScreenshotPrependedFrame,
   getLongScreenshotFrameUpdate,
+  getLongScreenshotMaximumHeight,
   getLongScreenshotNoticeState,
   type LongScreenshotMatchHistory,
   type LongScreenshotScrollState,
@@ -89,6 +90,10 @@ import {
   parseRecordingConfiguration,
   type RecordingConfiguration,
 } from '../src/core/recording-options';
+import {
+  hideRecordingOverlaysBeforeCapture,
+  shouldShowRecordingOverlay,
+} from '../src/core/recording-overlays';
 import {
   createSingleFlightScreenCapturePermissionRequest,
   requestScreenCapturePermissionStatus,
@@ -182,6 +187,7 @@ let tray: Tray | undefined;
 let isQuitting = false;
 let nativeScreenCaptureVerified = false;
 let captureGranted = false;
+let recordingCapturePrepared = false;
 let activePlan: CapturePlan | undefined;
 let outputPath: string | undefined;
 let startedAt: number | undefined;
@@ -930,6 +936,8 @@ function createRecordingWindow(display: Display): void {
     webPreferences: secureWebPreferences(),
   });
   recordingWindow.setContentProtection(true);
+  // Keep the media producer compositing without adding a visible pixel to macOS captures.
+  if (process.platform === 'darwin') recordingWindow.setOpacity(0);
   recordingWindow.setIgnoreMouseEvents(true);
   recordingWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   recordingWindow.once('ready-to-show', () => recordingWindow?.showInactive());
@@ -965,7 +973,11 @@ function createIndicatorWindow(display: Display): void {
   indicatorWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
   indicatorWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   indicatorWindow.once('ready-to-show', () => {
-    if (!indicatorWindow) return;
+    if (
+      !indicatorWindow ||
+      !shouldShowRecordingOverlay(process.platform, recorderSession.state, recordingCapturePrepared)
+    )
+      return;
     fitOverlayToDisplay(indicatorWindow, display);
     indicatorWindow.showInactive();
   });
@@ -1002,7 +1014,13 @@ function createControlWindow(display: Display): void {
   controlWindow.setContentProtection(true);
   controlWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
   controlWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
-  controlWindow.once('ready-to-show', () => controlWindow?.showInactive());
+  controlWindow.once('ready-to-show', () => {
+    if (
+      shouldShowRecordingOverlay(process.platform, recorderSession.state, recordingCapturePrepared)
+    ) {
+      controlWindow?.showInactive();
+    }
+  });
   controlWindow.on('closed', () => {
     controlWindow = undefined;
   });
@@ -1750,8 +1768,9 @@ async function captureLongScreenshotFrame(): Promise<void> {
       : undefined;
     const frameUpdate = getLongScreenshotFrameUpdate(capture.scrollState, match);
     const addedRows = frameUpdate.prependRows ?? frameUpdate.appendRows;
-    if (addedRows && capture.pixelHeight + addedRows > 30_000) {
-      changed = updateLongScreenshotNotice(capture, '已达到 30000 px 上限，请完成截图');
+    const maximumHeight = getLongScreenshotMaximumHeight(current.width);
+    if (addedRows && capture.pixelHeight + addedRows > maximumHeight) {
+      changed = updateLongScreenshotNotice(capture, `已达到 ${maximumHeight} px 上限，请完成截图`);
       return;
     }
     if (frameUpdate.updateReference) {
@@ -1840,6 +1859,9 @@ async function startLongScreenshot(operationId: string, firstPng: Uint8Array): P
   const firstImage = nativeImage.createFromBuffer(Buffer.from(firstPng));
   if (firstImage.isEmpty()) throw new Error('长截图首帧无法读取');
   const firstFrame = bitmapFrameFromImage(firstImage);
+  if (firstFrame.height > getLongScreenshotMaximumHeight(firstFrame.width)) {
+    throw new Error('当前选区过大，请缩小选区后再开始长截图');
+  }
   const controlLayout = getLongScreenshotControlLayout(
     task.display.workArea,
     selection,
@@ -1935,12 +1957,8 @@ async function finishLongScreenshot(): Promise<void> {
     destroyScreenshotEditorWindow();
     broadcast();
   } catch (error) {
-    screenshotSession.fail();
-    clearLongScreenshotCapture();
-    destroyLongScreenshotIndicatorWindow();
-    destroyLongScreenshotControlWindow();
-    destroyScreenshotEditorWindow();
     errorMessage = `无法复制长截图：${error instanceof Error ? error.message : '未知错误'}`;
+    updateLongScreenshotNotice(capture, `${errorMessage}，可重试完成或取消`);
     notify('长截图失败', errorMessage);
     broadcast();
     throw error;
@@ -2073,6 +2091,7 @@ async function beginRecording(mode: 'screen' | 'region'): Promise<void> {
     outputPath = undefined;
     startedAt = undefined;
     captureGranted = false;
+    recordingCapturePrepared = false;
     destroyCompletionWindow();
     concealMainWindow();
     if (mode === 'screen') {
@@ -2219,6 +2238,7 @@ async function startConfiguredRecording(configuration: RecordingConfiguration): 
     configuration.container,
     configuration.options,
   );
+  recordingCapturePrepared = false;
   createRecordingWindow(pending.display);
   if (!indicatorWindow || indicatorWindow.isDestroyed()) {
     createIndicatorWindow(pending.display);
@@ -3033,8 +3053,18 @@ function registerIpc(): void {
     ) {
       throw new Error('录制操作已失效');
     }
+    const plan = activePlan;
+    recordingCapturePrepared = true;
+    await hideRecordingOverlaysBeforeCapture(
+      process.platform,
+      [indicatorWindow, controlWindow],
+      () => new Promise((resolve) => setTimeout(resolve, SCREENSHOT_OVERLAY_HIDE_SETTLE_MS)),
+    );
+    if (recorderSession.state !== 'countdown' || activePlan !== plan) {
+      throw new Error('录制操作已失效');
+    }
     captureGranted = true;
-    return activePlan;
+    return plan;
   });
 
   ipcMain.handle(IPC_CHANNELS.startWriting, async (event, mimeType: unknown) => {
