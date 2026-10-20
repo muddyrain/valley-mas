@@ -41,14 +41,15 @@ for tool_dir in .claude .codex .codebase .trae; do
   ln -s ../.agents/skills "$FIXTURE_ROOT/$tool_dir/skills"
 done
 
-cat > "$FIXTURE_ROOT/CLAUDE.md" <<'EOF'
-# Fixture CLAUDE
+cat > "$FIXTURE_ROOT/AGENTS.md" <<'EOF'
+# Fixture AGENTS
 
 | Project | Entry |
 |---|---|
-| Example | `apps/example/AGENTS.md` |
+| Example | [Entry](apps/example/AGENTS.md) |
 EOF
-ln -s CLAUDE.md "$FIXTURE_ROOT/AGENTS.md"
+printf '@AGENTS.md\n' > "$FIXTURE_ROOT/CLAUDE.md"
+printf '{"analyze":{"indexOnly":true}}\n' > "$FIXTURE_ROOT/.gitnexusrc"
 
 printf '# Child AGENTS\n' > "$FIXTURE_ROOT/apps/example/AGENTS.md"
 printf '# Docs index\n' > "$FIXTURE_ROOT/docs/README.md"
@@ -73,6 +74,20 @@ healthy_output="$(HARNESS_ROOT="$FIXTURE_ROOT" bash "$CHECKER")"
   exit 1
 }
 
+for config_case in missing disabled malformed; do
+  case "$config_case" in
+    missing) rm "$FIXTURE_ROOT/.gitnexusrc" ;;
+    disabled) printf '{"analyze":{"indexOnly":false}}\n' > "$FIXTURE_ROOT/.gitnexusrc" ;;
+    malformed) printf '{broken json\n' > "$FIXTURE_ROOT/.gitnexusrc" ;;
+  esac
+  if HARNESS_ROOT="$FIXTURE_ROOT" bash "$CHECKER" >"$FIXTURE_ROOT/gitnexus.out" 2>&1; then
+    echo "FAIL: $config_case GitNexus protection unexpectedly passed" >&2
+    exit 1
+  fi
+  grep -Fq '.gitnexusrc:' "$FIXTURE_ROOT/gitnexus.out"
+done
+printf '{"analyze":{"indexOnly":true}}\n' > "$FIXTURE_ROOT/.gitnexusrc"
+
 mkdir -p "$FIXTURE_ROOT/.agents/skills/unlisted-skill"
 cat > "$FIXTURE_ROOT/.agents/skills/unlisted-skill/SKILL.md" <<'EOF'
 ---
@@ -96,5 +111,32 @@ fi
   echo "$unhealthy_output" >&2
   exit 1
 }
+
+rm -rf -- "$FIXTURE_ROOT/.agents/skills/unlisted-skill"
+
+mkdir -p "$FIXTURE_ROOT/.agents/skills/tools/nested"
+printf '# Nested skill\n' > "$FIXTURE_ROOT/.agents/skills/tools/nested/SKILL.md"
+if HARNESS_ROOT="$FIXTURE_ROOT" bash "$CHECKER" >"$FIXTURE_ROOT/nested.out" 2>&1; then
+  echo "FAIL: unlisted nested skill unexpectedly passed" >&2
+  exit 1
+fi
+grep -Fq 'tools/nested: SKILL.md exists but is not listed in INDEX.md' "$FIXTURE_ROOT/nested.out"
+printf '| `tools/nested` | required |\n' >> "$FIXTURE_ROOT/.agents/skills/INDEX.md"
+HARNESS_ROOT="$FIXTURE_ROOT" bash "$CHECKER" >"$FIXTURE_ROOT/nested-pass.out"
+
+
+printf '\n# Duplicate rules\n' >> "$FIXTURE_ROOT/CLAUDE.md"
+if HARNESS_ROOT="$FIXTURE_ROOT" bash "$CHECKER" >"$FIXTURE_ROOT/compat.out" 2>&1; then
+  echo "FAIL: duplicated compatibility rules unexpectedly passed" >&2
+  exit 1
+fi
+grep -Fq 'CLAUDE.md: must contain only @AGENTS.md' "$FIXTURE_ROOT/compat.out"
+printf '@AGENTS.md\n' > "$FIXTURE_ROOT/CLAUDE.md"
+printf '\n' > "$FIXTURE_ROOT/AGENTS.md"
+if HARNESS_ROOT="$FIXTURE_ROOT" bash "$CHECKER" >"$FIXTURE_ROOT/root.out" 2>&1; then
+  echo "FAIL: missing root entry unexpectedly passed" >&2
+  exit 1
+fi
+grep -Fq 'apps/example/AGENTS.md: local entry is missing from root AGENTS.md' "$FIXTURE_ROOT/root.out"
 
 echo "PASS: check-agent-harness fixtures"

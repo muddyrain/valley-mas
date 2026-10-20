@@ -1,6 +1,6 @@
 # 第一批 World Asset Audit
 
-2026-09-12。基于用户实际文件、原始GLB数据及Godot四面渲染，不按文件名推测模型方向。配套[交付报告](../docs/WORLD_MAP_REPORT.md)与[精确数据](world_asset_audit.json)。
+2026-09-12。基于用户实际文件、原始GLB数据及Godot四面渲染，不按文件名推测模型方向。配套[交付报告](../docs/archive/2026-10/stages/WORLD_MAP_REPORT.md)与[精确数据](world_asset_audit.json)。
 
 ## 共同检查
 
@@ -151,7 +151,7 @@ Runtime Root全部identity。下表Size为ModelRoot纠正后的X/Y/Z米；所有
 
 ## BAR_001源件取舍
 
-源文件名 `Meshy_AI_VEG_001_tree_broadlea_0912032355_texture.glb` 实为围栏；真正树模型是另一份0912032102文件。围栏存在大面积破网，长度仅约3.484m，不能当连续4m标准段。正式采用规则 Geometry 柱/横杆与按像素覆盖率过滤的 Alpha Blend 网片；源 GLB 和[破损 Wrapper](../scenes/world/barriers/barrier_chainlink_damaged.tscn)保留，不放进当前地图。旧硬 Alpha Cutout 会在运动中产生网纹密度跳变，当前处理及实机对比见[外出视觉报告](../docs/EXPEDITION_VISUAL_REPORT.md)。
+源文件名 `Meshy_AI_VEG_001_tree_broadlea_0912032355_texture.glb` 实为围栏；真正树模型是另一份0912032102文件。围栏存在大面积破网，长度仅约3.484m，不能当连续4m标准段。正式采用规则 Geometry 柱/横杆与按像素覆盖率过滤的 Alpha Blend 网片；源 GLB 和[破损 Wrapper](../scenes/world/barriers/barrier_chainlink_damaged.tscn)保留，不放进当前地图。旧硬 Alpha Cutout 会在运动中产生网纹密度跳变，当前处理及实机对比见[外出视觉报告](../docs/archive/2026-10/stages/EXPEDITION_VISUAL_REPORT.md)。
 
 ## 视觉证据与可复现工作流
 

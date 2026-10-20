@@ -65,4 +65,4 @@ GLB 关闭动画导入，使用 named skins。贴图按 Godot [Embed as Basis Un
 
 已有公共库在 assets/animations/humanoid/locomotion/，只有一份 Idle/Walk/Run。survivor_animation_controller.gd 用 Blender 导出的无网格参考骨架和 Godot RetargetModifier3D 驱动各角色，再按实际移动速度选择状态。本次只验证兼容，不重做或增加动作。
 
-art/build_humanoid_review.ps1 构建 build/BH_Humanoid_Rig_v1_Review.exe，每次清空自己的临时项目，防止旧资源混入。run.ps1 -Mode build 构建 build/BlueHourHomeward.exe。两个入口都检查独立启动。当前状态与限制见 [模型替换报告](../../docs/CHARACTER_REPLACEMENT_REPORT.md)。截图、日志、临时项目和导出物不进入 Git。
+art/build_humanoid_review.ps1 构建 build/BH_Humanoid_Rig_v1_Review.exe，每次清空自己的临时项目，防止旧资源混入。run.ps1 -Mode build 构建 build/BlueHourHomeward.exe。两个入口都检查独立启动。当前状态与限制见 [模型替换报告](../../docs/archive/2026-10/stages/CHARACTER_REPLACEMENT_REPORT.md)。截图、日志、临时项目和导出物不进入 Git。

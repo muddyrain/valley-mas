@@ -2,7 +2,7 @@
 
 ## Survivor 当前冻结 Production Baseline（2026-09-19）
 
-清理清单与验证结果见[生产收尾报告](../docs/SURVIVOR_PRODUCTION_FINALIZATION_REPORT.md)。
+清理清单与验证结果见[生产收尾报告](../docs/archive/2026-10/stages/SURVIVOR_PRODUCTION_FINALIZATION_REPORT.md)。
 
 SUR_001～SUR_012 的 165cm 正式 Runtime、23 骨 `BH_Humanoid_Rig_v1`、canonical T-Pose Bind、Shared Skin Contract、Public Idle / Walking / Running、Expedition Walkable Ground Contract 均已通过验收。Expedition 基础速度为 **2.8m/s**。不生成 V2/V3 或角色专属 Locomotion。
 
@@ -16,7 +16,7 @@ SUR_001～SUR_012 的 165cm 正式 Runtime、23 骨 `BH_Humanoid_Rig_v1`、canon
 
 ## Unified Survivor Runtime roster
 
-SUR_001～SUR_012 均使用 1.65m Runtime Envelope、冻结的 23 骨 `BH_Humanoid_Rig_v1`、1 Skin 与同一套公共 Locomotion。SUR_003～SUR_012 源模型均为单 Mesh、单材质、三张 2048² 贴图的静态 A-Pose；生产导出无 embedded animation、无无权重顶点，最多 4 骨影响。完整 QA 见[批次接入报告](../docs/REMAINING_10_SURVIVOR_RUNTIME_INTEGRATION_REPORT.md)。
+SUR_001～SUR_012 均使用 1.65m Runtime Envelope、冻结的 23 骨 `BH_Humanoid_Rig_v1`、1 Skin 与同一套公共 Locomotion。SUR_003～SUR_012 源模型均为单 Mesh、单材质、三张 2048² 贴图的静态 A-Pose；生产导出无 embedded animation、无无权重顶点，最多 4 骨影响。完整 QA 见[批次接入报告](../docs/archive/2026-10/stages/REMAINING_10_SURVIVOR_RUNTIME_INTEGRATION_REPORT.md)。
 
 | Survivor | 正式 Runtime GLB | LOD0 tris | Definition | 状态 |
 | --- | --- | ---: | --- | --- |
@@ -40,33 +40,33 @@ SUR_001～SUR_012 均使用 1.65m Runtime Envelope、冻结的 23 骨 `BH_Humano
 
 ## Standard Survivor Template 静态基线
 
-2026-09-17：女性标准模板唯一入口为 [survivor_animation_template.tscn](../assets/characters/survivor_animation_template/survivor_animation_template.tscn)，实测 1.6499997m、28 骨、34,098 顶点、49,349 三角形。保留源 Rest Pose 和权重，不接入源 FBX 的动作；场景无 AnimationPlayer / AnimationTree，不接入正式角色或 gameplay。静态鞋底接地通过，左右 Toe_End 轴存在最大约 28.8° 镜像差，后续动作制作前须明确处理策略；本轮不修正。源哈希、完整层级、地面与蒙皮检查见 [静态基线报告](../docs/STANDARD_SURVIVOR_TEMPLATE_BASELINE.md)。此模板独立于下述环境套件统计。
+2026-09-17：女性标准模板唯一入口为 [survivor_animation_template.tscn](../assets/characters/survivor_animation_template/survivor_animation_template.tscn)，实测 1.6499997m、28 骨、34,098 顶点、49,349 三角形。保留源 Rest Pose 和权重，不接入源 FBX 的动作；场景无 AnimationPlayer / AnimationTree，不接入正式角色或 gameplay。静态鞋底接地通过，左右 Toe_End 轴存在最大约 28.8° 镜像差，后续动作制作前须明确处理策略；本轮不修正。源哈希、完整层级、地面与蒙皮检查见 [静态基线报告](../docs/archive/2026-10/stages/STANDARD_SURVIVOR_TEMPLATE_BASELINE.md)。此模板独立于下述环境套件统计。
 
-2026-09-17：源 Idle_4 的接地专项修正输出到模板专属 [animations/idle.tres](../assets/characters/survivor_animation_template/animations/idle.tres)，制作源为 [standard_survivor_idle.blend](blender/characters/standard_survivor_idle.blend)。14 秒，双腿/Foot/ToeBase 与必要骨盆高度修正已烘焙；原静态入口和正式角色不变，无 Runtime IK。接地测量、四视角和后跟残余蒙皮变化见 [接地验收报告](../docs/STANDARD_SURVIVOR_IDLE_FOOT_CONTACT.md)，未接入公共动画或 gameplay。
+2026-09-17：源 Idle_4 的接地专项修正输出到模板专属 [animations/idle.tres](../assets/characters/survivor_animation_template/animations/idle.tres)，制作源为 [standard_survivor_idle.blend](blender/characters/standard_survivor_idle.blend)。14 秒，双腿/Foot/ToeBase 与必要骨盆高度修正已烘焙；原静态入口和正式角色不变，无 Runtime IK。接地测量、四视角和后跟残余蒙皮变化见 [接地验收报告](../docs/archive/2026-10/stages/STANDARD_SURVIVOR_IDLE_FOOT_CONTACT.md)，未接入公共动画或 gameplay。
 
-2026-09-17：Walking 接地/支撑速度/Loop 修正输出到模板专属 [animations/walking.tres](../assets/characters/survivor_animation_template/animations/walking.tres)，制作源 [standard_survivor_walking.blend](blender/characters/standard_survivor_walking.blend)。保持 1.0416667 秒、24 FPS 时间轴和原地形式，120Hz 子帧烘焙；支撑参考 1.425m/s，首尾闭合。四视角、接地与残余滑动对比见 [Walking 修正报告](../docs/STANDARD_SURVIVOR_WALKING_FOOT_CONTACT.md)。候选已交付，等待视觉验收；未修改静态模板、Idle、正式角色或 gameplay，不继续 Running。
+2026-09-17：Walking 接地/支撑速度/Loop 修正输出到模板专属 [animations/walking.tres](../assets/characters/survivor_animation_template/animations/walking.tres)，制作源 [standard_survivor_walking.blend](blender/characters/standard_survivor_walking.blend)。保持 1.0416667 秒、24 FPS 时间轴和原地形式，120Hz 子帧烘焙；支撑参考 1.425m/s，首尾闭合。四视角、接地与残余滑动对比见 [Walking 修正报告](../docs/archive/2026-10/stages/STANDARD_SURVIVOR_WALKING_FOOT_CONTACT.md)。候选已交付，等待视觉验收；未修改静态模板、Idle、正式角色或 gameplay，不继续 Running。
 
-2026-09-18：用户确认 Rest / Idle V1 / Walking V1 均 PASS，覆盖上段 Walking 待验收状态。源 Running 已完成独立原样验收，0.666667 秒、24 FPS、180 步/分钟；本轮没有正式 Running 动作导出或资源修改。支撑悬空、摆臂与 Loop 结果见 [Running 原样报告](../docs/STANDARD_SURVIVOR_RUNNING_REVIEW.md)，等待视觉验收，不自动推进修正。
+2026-09-18：用户确认 Rest / Idle V1 / Walking V1 均 PASS，覆盖上段 Walking 待验收状态。源 Running 已完成独立原样验收，0.666667 秒、24 FPS、180 步/分钟；本轮没有正式 Running 动作导出或资源修改。支撑悬空、摆臂与 Loop 结果见 [Running 原样报告](../docs/archive/2026-10/stages/STANDARD_SURVIVOR_RUNNING_REVIEW.md)，等待视觉验收，不自动推进修正。
 
-2026-09-18：根据用户后续授权完成无武器持续 Run 重构候选，正式动作 [animations/running.tres](../assets/characters/survivor_animation_template/animations/running.tres)，制作源 [standard_survivor_running.blend](blender/characters/standard_survivor_running.blend)。0.666667 秒 / 180 步频保留，支撑与摆臂已重构、完整循环闭合；反推匹配速度约 2.57m/s，未写入 Gameplay。测量、四视频和后跟残差见 [重构报告](../docs/STANDARD_SURVIVOR_RUNNING_RECONSTRUCTION.md)。等待视觉验收，不推进 Combat Jog / Armed Run。
+2026-09-18：根据用户后续授权完成无武器持续 Run 重构候选，正式动作 [animations/running.tres](../assets/characters/survivor_animation_template/animations/running.tres)，制作源 [standard_survivor_running.blend](blender/characters/standard_survivor_running.blend)。0.666667 秒 / 180 步频保留，支撑与摆臂已重构、完整循环闭合；反推匹配速度约 2.57m/s，未写入 Gameplay。测量、四视频和后跟残差见 [重构报告](../docs/archive/2026-10/stages/STANDARD_SURVIVOR_RUNNING_RECONSTRUCTION.md)。等待视觉验收，不推进 Combat Jog / Armed Run。
 
 ## Xia / Su 统一生产 Locomotion
 
 2026-09-19：用户已验收 165cm T-Pose Bind + Skin Polish，两角色正式入口为 [Xia](../assets/characters/xia_zhiyao/runtime/xia_zhiyao.glb) 与 [Su](../assets/characters/su_wanxing/runtime/su_wanxing.glb)，LOD0 分别 101,982 / 102,500 tris。两者原生冻结 BH_Humanoid_Rig_v1 23 骨，直接引用唯一[公共动画库](../assets/animations/public_locomotion/public_locomotion.tres)，不再使用角色专属 Locomotion Retarget。Expedition 2.8m/s，Run reference 2.276231530m/s；Camp 原行为不变。
 
-[生产接入报告](../docs/SURVIVOR_PRODUCTION_INTEGRATION_REPORT.md)记录视频、接地、武器和独立 EXE 证据。旧 Xia 专属三动作已删除；两份无引用旧 source GLB 因工具删除审批被拒绝暂留，不打入生产包。Standard 三动作制作源和 canonical 公共库继续保留。旧 [Retarget 报告](../docs/XIA_ZHIYAO_STANDARD_LOCOMOTION_RETARGET.md)仅为历史记录。
+[生产接入报告](../docs/archive/2026-10/stages/SURVIVOR_PRODUCTION_INTEGRATION_REPORT.md)记录视频、接地、武器和独立 EXE 证据。旧 Xia 专属三动作已删除；两份无引用旧 source GLB 因工具删除审批被拒绝暂留，不打入生产包。Standard 三动作制作源和 canonical 公共库继续保留。旧 [Retarget 报告](../docs/archive/2026-10/stages/XIA_ZHIYAO_STANDARD_LOCOMOTION_RETARGET.md)仅为历史记录。
 
 ## 环境套件
 
-2026-09-17 Medium Town M01 根据用户旧资产白名单接入 11 项 World wrapper：PRP_003 Bench、004 Pallet、005 WoodCrate、006 MetalCrate、008 DirectionSign、009 VendingMachine、011 可选 Planter，BAR_002 住宅低栏、003 混凝土路障、004 金属拒马、005 破损工业围网。直接引用旧 GLB 或序列化现有 Camp recipe，不新增模型或贴图。可搜索售货机 / 箱体与公告板不进入装饰随机池。源 ID、用途边界见 [白名单](../docs/MEDIUM_TOWN_ENVIRONMENT_REUSE_SELECTION.md)，Runtime 路径、验证与截图见 [M01 报告](../docs/MEDIUM_TOWN_ENVIRONMENT_M01_REPORT.md)。
+2026-09-17 Medium Town M01 根据用户旧资产白名单接入 11 项 World wrapper：PRP_003 Bench、004 Pallet、005 WoodCrate、006 MetalCrate、008 DirectionSign、009 VendingMachine、011 可选 Planter，BAR_002 住宅低栏、003 混凝土路障、004 金属拒马、005 破损工业围网。直接引用旧 GLB 或序列化现有 Camp recipe，不新增模型或贴图。可搜索售货机 / 箱体与公告板不进入装饰随机池。源 ID、用途边界见 [白名单](../docs/archive/2026-10/stages/MEDIUM_TOWN_ENVIRONMENT_REUSE_SELECTION.md)，Runtime 路径、验证与截图见 [M01 报告](../docs/archive/2026-10/stages/MEDIUM_TOWN_ENVIRONMENT_M01_REPORT.md)。
 
-当前 CAMP Composition 02B（2026-09-14）沿用下述 Pass 02 的 6 树 / 21 Bush，重组为六个树根主群与三个矮植被次群；树缩放 0.72/0.78，主群 Bush 为 1.00/0.84/0.68、次群为 0.62，草花群由 16 调为 30（含花箱）。围栏改为蓝灰柱 + 米灰旧木宽横梁 + 稀疏钢带，保留约 1.01m 高与原碰撞。无新 Blender/Meshy/GLB。当前构图、数量、性能与导航证据见 [02B 报告](../docs/CAMP_ENVIRONMENT_COMPOSITION_PASS_02B_REPORT.md)；以下 Pass 02 参数为改前记录。
+当前 CAMP Composition 02B（2026-09-14）沿用下述 Pass 02 的 6 树 / 21 Bush，重组为六个树根主群与三个矮植被次群；树缩放 0.72/0.78，主群 Bush 为 1.00/0.84/0.68、次群为 0.62，草花群由 16 调为 30（含花箱）。围栏改为蓝灰柱 + 米灰旧木宽横梁 + 稀疏钢带，保留约 1.01m 高与原碰撞。无新 Blender/Meshy/GLB。当前构图、数量、性能与导航证据见 [02B 报告](../docs/archive/2026-10/stages/CAMP_ENVIRONMENT_COMPOSITION_PASS_02B_REPORT.md)；以下 Pass 02 参数为改前记录。
 
-2026-09-14 CAMP Environment Polish Pass 02 复用 `VEG_001_tree_broadleaf_a`（6 株，等比约 0.75–0.90）与 `VEG_002_bush_a`（7 组共 21 株，等比 0.52/0.70/0.88），仅营地实例移除碰撞并使用既有植被 Shader。原模型与 wrapper 不改。`camp/camp_dressing.gd` 组合 Godot 规则矮栏（高约 1.01m，原段长 4.5/5.5m）、柱脚/檐框/灯具与低矮草花，复用营地材质合批；无新 GLB 或 Blender 模块。证据与边界见 [环境第二轮报告](../docs/CAMP_ENVIRONMENT_POLISH_PASS_02_REPORT.md)。
+2026-09-14 CAMP Environment Polish Pass 02 复用 `VEG_001_tree_broadleaf_a`（6 株，等比约 0.75–0.90）与 `VEG_002_bush_a`（7 组共 21 株，等比 0.52/0.70/0.88），仅营地实例移除碰撞并使用既有植被 Shader。原模型与 wrapper 不改。`camp/camp_dressing.gd` 组合 Godot 规则矮栏（高约 1.01m，原段长 4.5/5.5m）、柱脚/檐框/灯具与低矮草花，复用营地材质合批；无新 GLB 或 Blender 模块。证据与边界见 [环境第二轮报告](../docs/archive/2026-10/stages/CAMP_ENVIRONMENT_POLISH_PASS_02_REPORT.md)。
 
-正式营地主站使用用户原件 [CAMP_001_main_station.glb](../assets/world/buildings/CAMP_001_main_station.glb)，唯一 [wrapper](../scenes/camp/buildings/camp_main_station.tscn) 由冻结 Camp 实例化。当前为 4K 版本：BaseColor / Normal 4096²、MetallicRoughness 原始 2048²；27,592 tris、1 Mesh / 材质、内嵌 PBR。Visual 等比 1.097386，总包围盒宽 12.000 / 高 4.170 / 深 6.704m（含天线、雨棚和台阶），中央主体屋面约高 3.24m、中央屋顶设备约 3.58m；3 个 Box 简单碰撞。此项不进入旧 Blender 生成批次；接入与出发演出见 [Camp Departure V1](../docs/CAMP_DEPARTURE_V1.md)，当前导入与主 Viewport 验证见 [清晰度报告](../docs/CAMP_CLARITY_REPORT.md)。
+正式营地主站使用用户原件 [CAMP_001_main_station.glb](../assets/world/buildings/CAMP_001_main_station.glb)，唯一 [wrapper](../scenes/camp/buildings/camp_main_station.tscn) 由冻结 Camp 实例化。当前为 4K 版本：BaseColor / Normal 4096²、MetallicRoughness 原始 2048²；27,592 tris、1 Mesh / 材质、内嵌 PBR。Visual 等比 1.097386，总包围盒宽 12.000 / 高 4.170 / 深 6.704m（含天线、雨棚和台阶），中央主体屋面约高 3.24m、中央屋顶设备约 3.58m；3 个 Box 简单碰撞。此项不进入旧 Blender 生成批次；接入与出发演出见 [Camp Departure V1](../docs/archive/2026-10/stages/CAMP_DEPARTURE_V1.md)，当前导入与主 Viewport 验证见 [清晰度报告](../docs/archive/2026-10/stages/CAMP_CLARITY_REPORT.md)。
 
-正式外出街区已使用首批16项World资产，完整目录、Wrapper、实测尺寸和接入状态见 [WORLD_ASSET_AUDIT](WORLD_ASSET_AUDIT.md)。下表旧Blender库中“东岸旧街”的摆放说明为历史位置，已由本批Wrapper替换；仍保留资产库、营地或展厅引用，不表示当前正式外出仍走旧模型。道路、围栏的当前规则实现见 [WORLD_MAP_REPORT](../docs/WORLD_MAP_REPORT.md)。
+正式外出街区已使用首批16项World资产，完整目录、Wrapper、实测尺寸和接入状态见 [WORLD_ASSET_AUDIT](WORLD_ASSET_AUDIT.md)。下表旧Blender库中“东岸旧街”的摆放说明为历史位置，已由本批Wrapper替换；仍保留资产库、营地或展厅引用，不表示当前正式外出仍走旧模型。道路、围栏的当前规则实现见 [WORLD_MAP_REPORT](../docs/archive/2026-10/stages/WORLD_MAP_REPORT.md)。
 
 正式普通感染者的 Art Source 登记于 `assets/characters/infected_basic_a/model/source/ENM_001_infected_basic_a.glb`（81,874 tris，58,441 顶点，1.65 米）。正式行动只实例化 `assets/characters/infected_basic_a/runtime/ENM_001_infected_basic_a_30k.glb`；旧源已归档到 `legacy/`，下表 `BH_Infected_Basic_Placeholder` 仅保留于历史资产库和既有美术展厅，不进入刷怪池。
 
@@ -189,14 +189,14 @@ Blender 5.2.1 LTS 新增 24 个独立低模，每件有可编辑 `.blend` 源和
 
 ## 正式蓝时号
 
-Camp Visual Polish Pass 02 通过 `camp/camp_dressing.gd` 额外复用 `BH_Bench_01`（2 张，等比 0.72）、`BH_WoodCrate`（生活区 0.68 / 外围 0.72）、`BH_MetalCrate`（工坊 0.72 / 生活区 0.64 / 外围 0.48）与 `BH_Pallet`（生活区 0.68）。这些是原模型的营地装配缩放，不改 GLB 和源比例；不新增模型种类。实例只贡献静态视觉，碰撞与交互继续由既有营地根持有；渲染网格按营地共享色板合并。棚架、窗框与桌面是原场景的轻量规则几何补足。详见 [Pass 02 报告](../docs/CAMP_VISUAL_POLISH_PASS_02_REPORT.md)。
+Camp Visual Polish Pass 02 通过 `camp/camp_dressing.gd` 额外复用 `BH_Bench_01`（2 张，等比 0.72）、`BH_WoodCrate`（生活区 0.68 / 外围 0.72）、`BH_MetalCrate`（工坊 0.72 / 生活区 0.64 / 外围 0.48）与 `BH_Pallet`（生活区 0.68）。这些是原模型的营地装配缩放，不改 GLB 和源比例；不新增模型种类。实例只贡献静态视觉，碰撞与交互继续由既有营地根持有；渲染网格按营地共享色板合并。棚架、窗框与桌面是原场景的轻量规则几何补足。详见 [Pass 02 报告](../docs/archive/2026-10/missing-sources.md#camp-visual-polish-pass-02-report)。
 
-新版蓝时号唯一入口为 `scenes/world/vehicles/veh_blue_hour.tscn`，旧 `BH_EvacBus_01` 仅保留为兼容资源 ID。源 GLB 字节、原始比例和 Scale=1 保持不变；Visual 内绕 Y 旋转 +90°，将源 -X 车头对齐项目 +Z，平移至地面投影中心。车轮、车门与灯面合并在一个 Mesh 中；后续物理动画需要拆分。旧 Blender 源和生成函数只作历史来源保留，常规车辆批次不再生成旧蓝时号。详见[替换验收报告](../docs/BLUE_HOUR_VEHICLE_REPORT.md)。
+新版蓝时号唯一入口为 `scenes/world/vehicles/veh_blue_hour.tscn`，旧 `BH_EvacBus_01` 仅保留为兼容资源 ID。源 GLB 字节、原始比例和 Scale=1 保持不变；Visual 内绕 Y 旋转 +90°，将源 -X 车头对齐项目 +Z，平移至地面投影中心。车轮、车门与灯面合并在一个 Mesh 中；后续物理动画需要拆分。旧 Blender 源和生成函数只作历史来源保留，常规车辆批次不再生成旧蓝时号。详见[替换验收报告](../docs/archive/2026-10/stages/BLUE_HOUR_VEHICLE_REPORT.md)。
 
 
 ## 正式装备武器（Phase 2A）
 
-运行时装备模型来自 WeaponDefinition.model_path，跟随 RightHand；无碰撞，比例为 1 米制。K9 复用已有 `BH_SMG_01` 网格，只补正式 `WeaponRoot`、双手握点和枪口标记；其几何与正式武器数值未缩放或重制。原有三把的制作背景见 [武器模型报告](../docs/WEAPON_VISUALS.md)。
+运行时装备模型来自 WeaponDefinition.model_path，跟随 RightHand；无碰撞，比例为 1 米制。K9 复用已有 `BH_SMG_01` 网格，只补正式 `WeaponRoot`、双手握点和枪口标记；其几何与正式武器数值未缩放或重制。原有三把的制作背景见 [武器模型报告](../docs/archive/2026-10/stages/WEAPON_VISUALS.md)。
 
 | 对象 | 正式 GLB | Blender 源 | tris |
 | --- | --- | --- | ---: |
@@ -207,7 +207,7 @@ Camp Visual Polish Pass 02 通过 `camp/camp_dressing.gd` 额外复用 `BH_Bench
 
 ## Environment Asset Batch 01（2026-09-18）
 
-用户提供的四件带贴图 Meshy GLB 已进入 World Runtime；源字节不变，单位缩放、简单碰撞及 Marker 齐全，全部不可搜索。2026-09-18 用户确认四件人工 Asset QA = PASS；2026-09-19 用户确认 M02 Human Visual QA = PASS。独立 M02 Placement Pass 已在冻结 M01.1 之后按用途标签摆放，未改变通用生成权重、资产或既有生成器。规格与源路径见 [接入报告](../docs/ENVIRONMENT_STREET_ASSET_REPORT.md)，分布、验证和截图见 [M02 报告](../docs/MEDIUM_TOWN_TARGETED_PROPS_REPORT.md)。
+用户提供的四件带贴图 Meshy GLB 已进入 World Runtime；源字节不变，单位缩放、简单碰撞及 Marker 齐全，全部不可搜索。2026-09-18 用户确认四件人工 Asset QA = PASS；2026-09-19 用户确认 M02 Human Visual QA = PASS。独立 M02 Placement Pass 已在冻结 M01.1 之后按用途标签摆放，未改变通用生成权重、资产或既有生成器。规格与源路径见 [接入报告](../docs/archive/2026-10/stages/ENVIRONMENT_STREET_ASSET_REPORT.md)，分布、验证和截图见 [M02 报告](../docs/archive/2026-10/stages/MEDIUM_TOWN_TARGETED_PROPS_REPORT.md)。
 
 | Runtime Asset ID | tris / verts | Runtime 尺寸 cm（宽×高×深） | Wrapper |
 |---|---:|---|---|
@@ -216,4 +216,4 @@ Camp Visual Polish Pass 02 通过 `camp/camp_dressing.gd` 额外复用 `BH_Bench
 | PRP_Storefront_AFrame_Sign_A | 3,914 / 4,213 | 60.74×105×52.60 | [Scene](../scenes/world/props/street/PRP_Storefront_AFrame_Sign_A.tscn) |
 | PRP_Bicycle_A | 12,152 / 11,913 | 76.85×105×169.84 | [Scene](../scenes/world/props/street/PRP_Bicycle_A.tscn) |
 
-2026-09-19 后续 Ground Contract 修复：双角色地面门禁 PASS。Actor World Y 与 Ground VFX 共用正式地表三角形查询；静态鞋底误差约 1.5–4.1mm。模型、Rig、Skin、公共动画未变。此前固定导航高度造成的 FAIL 已关闭，三人长途让行的既有失败另行记录，见[地面合同报告](../docs/EXPEDITION_GROUND_CONTRACT_REPORT.md)。
+2026-09-19 后续 Ground Contract 修复：双角色地面门禁 PASS。Actor World Y 与 Ground VFX 共用正式地表三角形查询；静态鞋底误差约 1.5–4.1mm。模型、Rig、Skin、公共动画未变。此前固定导航高度造成的 FAIL 已关闭，三人长途让行的既有失败另行记录，见[地面合同报告](../docs/archive/2026-10/stages/EXPEDITION_GROUND_CONTRACT_REPORT.md)。

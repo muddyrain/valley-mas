@@ -43,6 +43,15 @@ jobs:
       - name: Test agents context checker
         run: pnpm check:agents-context:test
 
+      - name: Check documentation links
+        run: pnpm check:docs-links -- --strict
+
+      - name: Test documentation link checker
+        run: pnpm check:docs-links:test
+
+      - name: Test agent harness
+        run: pnpm check:harness:test
+
       - name: Check plans index
         run: pnpm check:plans-index
 

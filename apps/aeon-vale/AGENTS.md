@@ -1,15 +1,24 @@
-# Aeon Vale 局部入口
+# Aeon Vale 协作入口
 
-## AI 任务最小上下文入口
+适用于 `apps/aeon-vale`，原生 Godot / GDScript 造世游戏。
 
-- `CLAUDE.md` -> `apps/aeon-vale/AGENTS.md` -> `apps/aeon-vale/project.godot`
+## 按任务读取
 
-范围和状态见 [产品计划](./docs/PLAN.md)。
+| 任务 | 入口 |
+|---|---|
+| 产品、领域术语或当前范围 | [上下文](CONTEXT.md)、[计划](docs/PLAN.md) |
+| 运行与验收 | [说明](README.md)、[验证入口](docs/VALIDATION.md)、[工程](project.godot) |
+| 地形、生态、植物或灾难 | [世界数据](scripts/world_data.gd)、[自然力](scripts/natural_forces.gd)、[笔刷](scripts/brush_mask.gd) |
+| 存档、编号或时间单位 | [保存](scripts/save_store.gd)，联查数据、笔刷与旧档迁移 |
+| 植被或地表表现 | [物种](scripts/plant_catalog.gd)、[资源读取](scripts/flora_sprites.gd)、[图集](scripts/pixel_flora.gd)、[土地](scripts/ground_art.gd)、[视图](scripts/world_view.gd)、[概览](scripts/overview_layer.gd) |
 
-## 局部边界
+## 关键约束
 
-- 原生 Godot 4.7 / GDScript / Compatibility 渲染；当前范围为地图造世、植物生态及六种天象与灾难神力，气温、生物和文明另按阶段推进。
-- 地形、生态、植物生命、地表物件和持续灾难状态由 `scripts/world_data.gd` 持有；`scripts/natural_forces.gd` 推进灾难，`scripts/brush_mask.gd` 统一四种笔刷范围。改编号或时间单位必须联查 `scripts/save_store.gd` 的版本校验、笔刷及旧存档迁移，保留旧年份与生命阶段；生态位置缓存必须覆盖玩家播种的个体，预览和笔刷共用 `tool_affects` 判断实际可作用地块。
-- WorldBox 只作实机体验参照；新增图像记录来源和使用方式，不提取参考游戏资源。物种目录见 `scripts/plant_catalog.gd`；全套植被 PNG 统一位于 `assets/vegetation`，由 `scripts/flora_sprites.gd` 读取，`scripts/pixel_flora.gd` 负责共享图集，土地由 `scripts/ground_art.gd` 绘制。禁止恢复废弃的资源版本目录或旧几何植被回退。`scripts/world_view.gd` 在同一世界坐标上切换概览与精细树形；`scripts/overview_layer.gd` 按变化区域上传带边缘余量的合成图，分区与完整地图必须一致。
-- 地图生成线程不访问场景节点；主线程只通过互斥保护的进度字段观察生成状态，完成后接管结果。
-- 实机验收同时检查远中近景、地表隐藏植被、加载中的响应、连续笔刷与完整生长和枯萎过程；生态更新不得依赖镜头位置。只通过无头导入不能宣称美术完成。运行命令见根项目指南。
+- 原生 Godot，Compatibility 渲染；引擎版本与命令查运行入口。地图生成线程只处理数据，主线程经互斥保护的进度观察并接管结果。
+- 编号、日历与生命阶段变化保留旧档语义；生态位置缓存包含玩家播种个体，预览与笔刷共用 `tool_affects`。
+- 植被 PNG 使用 `assets/vegetation`，概览与精细树形使用同一世界坐标；分区与完整地图一致，生态更新不依赖镜头。
+- WorldBox 仅作体验参考；新增图像记录来源和用途，资源复用沿现有流水线，不恢复废弃版本或旧几何回退。
+
+## 验证与文档
+
+实际检查远中近景、地表隐藏植被、加载响应、连续笔刷和生长枯萎；无头导入不能证明美术通过。命令见 [项目指南](../../docs/PROJECT_GUIDE.md)。术语变化更新 CONTEXT，规则决策更新对应 ADR，范围与状态更新计划，验收基线更新验证文档。

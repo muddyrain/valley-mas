@@ -30,111 +30,114 @@ if [[ -z "$DOC_LINKS_CHECK_PYTHON" ]]; then
 fi
 
 PYTHONIOENCODING=utf-8 "$DOC_LINKS_CHECK_PYTHON" - "$REPO_ROOT" "$MODE" <<'PY'
+import os
 import re
+import subprocess
 import sys
 from pathlib import Path
 from urllib.parse import unquote
 
 repo_root = Path(sys.argv[1]).resolve()
 mode = sys.argv[2]
-docs_root = repo_root / "docs"
-absolute_prefix = "/Users/bytedance/Desktop/study/valley-mas/"
-patterns = {
-    "file://": re.compile(r"\(file://"),
-    "repo-absolute-path": re.compile(r"\(" + re.escape(absolute_prefix)),
-}
 markdown_link_re = re.compile(r"!?\[[^\]]*\]\(([^\n)]*)\)")
-
+generated_dirs = {"test-output", "build", "dist", "coverage", "output", ".tmp", ".godot"}
+ignored_dirs = generated_dirs | {".git", "node_modules", ".next", ".turbo"}
 violations = []
 unresolved = []
+artifacts = []
 resolved_count = 0
 ignored_count = 0
 
 
 def scoped_markdown_files() -> list[Path]:
-    files: set[Path] = set()
-    claude_path = repo_root / "CLAUDE.md"
-    if claude_path.is_file():
-        files.add(claude_path)
-
-    if docs_root.is_dir():
-        files.update(path for path in docs_root.rglob("*.md") if path.is_file())
-
-    ignored_dirs = {".git", "node_modules"}
-    for path in repo_root.rglob("AGENTS.md"):
-        if any(part in ignored_dirs for part in path.parts):
-            continue
-        if path.is_file() and path.relative_to(repo_root).as_posix() != "AGENTS.md":
-            files.add(path)
-
-    return sorted(files)
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(repo_root), "ls-files", "--cached", "--others", "--exclude-standard", "-z"],
+            check=True, capture_output=True,
+        )
+        candidates = [Path(os.fsdecode(p)) for p in result.stdout.split(b"\0") if p]
+    except (FileNotFoundError, subprocess.CalledProcessError):
+        candidates = []
+        for current, dirs, files in os.walk(repo_root):
+            dirs[:] = [d for d in dirs if d not in ignored_dirs]
+            candidates.extend((Path(current) / name).relative_to(repo_root) for name in files)
+    return sorted({
+        repo_root / p for p in candidates
+        if p.suffix == ".md" and (repo_root / p).is_file()
+        and not any(part in ignored_dirs for part in p.parts)
+        and (len(p.parts) == 1 or p.parts[0] in {"docs", "apps", "server", "packages"}
+             or p.as_posix() in {".agents/AGENTS_TEMPLATE.md", ".agents/skills/INDEX.md", ".code-review/README.md"})
+    })
 
 
 def local_destination(raw_destination: str) -> str | None:
     destination = raw_destination.strip()
     if destination.startswith("<") and ">" in destination:
-        destination = destination[1 : destination.index(">")]
+        destination = destination[1:destination.index(">")]
     else:
         destination = destination.split(maxsplit=1)[0] if destination else ""
-
-    if not destination or destination.startswith("#"):
+    if not destination or destination.startswith(("#", "//")):
         return None
-    if re.match(r"^[a-zA-Z][a-zA-Z0-9+.-]*:", destination) or destination.startswith("//"):
+    destination = re.sub(r":\d+(?::\d+)?$", "", destination)
+    if re.match(r"^[a-zA-Z][a-zA-Z0-9+.-]*:", destination):
         return None
-    return destination
+    return unquote(destination.split("#", 1)[0].split("?", 1)[0]) or None
 
 
-for md_path in scoped_markdown_files():
+files = scoped_markdown_files()
+for md_path in files:
     try:
         lines = md_path.read_text(encoding="utf-8").splitlines()
     except UnicodeDecodeError:
-        # 跳过编码异常文件，避免把文本格式问题与链接规则混淆，便于后续单独排查。
+        violations.append((md_path, 0, "not UTF-8"))
         continue
-
-    in_fence = False
+    fence = None
     for line_no, line in enumerate(lines, start=1):
-        if line.lstrip().startswith(("```", "~~~")):
-            in_fence = not in_fence
+        marker = re.match(r"^\s*(`{3,}|~{3,})", line)
+        if marker:
+            token = marker.group(1)
+            if fence is None:
+                fence = token
+            elif token[0] == fence[0] and len(token) >= len(fence):
+                fence = None
             continue
-        if in_fence:
+        if fence:
             continue
-
-        for label, pattern in patterns.items():
-            for match in pattern.finditer(line):
-                violations.append((md_path, line_no, label, match.group(0)))
-
         for match in markdown_link_re.finditer(line):
-            destination = local_destination(match.group(1))
+            raw = match.group(1).strip()
+            destination = local_destination(raw)
+            if raw.startswith("file://") or re.match(r"^[A-Za-z]:[\\/]", raw) or (destination and Path(destination).is_absolute()):
+                violations.append((md_path, line_no, f"non-portable link -> {raw}"))
+                continue
             if destination is None:
                 ignored_count += 1
                 continue
-            target_path = unquote(destination.split("#", 1)[0].split("?", 1)[0])
-            if not target_path:
-                ignored_count += 1
+            target = (md_path.parent / destination).resolve()
+            try:
+                parts = target.relative_to(repo_root).parts
+            except ValueError:
+                unresolved.append((md_path, line_no, raw))
                 continue
-            if (md_path.parent / target_path).exists():
+            if any(part in generated_dirs for part in parts):
+                if not target.exists():
+                    artifacts.append((md_path, line_no, raw))
+                continue
+            if target.exists():
                 resolved_count += 1
-                continue
-            unresolved.append((md_path, line_no, destination))
+            else:
+                unresolved.append((md_path, line_no, raw))
 
-scope_count = len(scoped_markdown_files())
-print(
-    "REPORT: documentation links "
-    f"(checked {scope_count} Markdown files; {resolved_count} local links resolved; "
-    f"{len(unresolved)} unresolved; {ignored_count} external or anchor-only links skipped)"
-)
+print(f"REPORT: documentation links (checked {len(files)} Markdown files; {resolved_count} local links resolved; "
+      f"{len(unresolved)} unresolved; {ignored_count} external or anchor-only links skipped)")
 for path, line_no, destination in unresolved:
     print(f"- {path.relative_to(repo_root)}:{line_no}: unresolved local link -> {destination}")
-
+print(f"ARTIFACTS: {len(artifacts)} generated-output links unavailable locally (not a documentation failure)")
+for path, line_no, detail in violations:
+    print(f"- {path.relative_to(repo_root)}:{line_no}: {detail}", file=sys.stderr)
 if violations:
-    print("FAIL: docs contain non-portable links", file=sys.stderr)
-    print(f"TOTAL: {len(violations)}", file=sys.stderr)
-    for path, line_no, label, value in violations:
-        print(f"- {path.relative_to(repo_root)}:{line_no}: {label} -> {value}", file=sys.stderr)
-
+    print("FAIL: docs contain non-portable links or encoding errors", file=sys.stderr)
 if mode == "--strict" and unresolved:
     print("FAIL: unresolved local Markdown links", file=sys.stderr)
-
 if violations or (mode == "--strict" and unresolved):
     raise SystemExit(1)
 PY

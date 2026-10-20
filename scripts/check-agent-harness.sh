@@ -36,12 +36,25 @@ def require_file(relative_path: str) -> None:
         errors.append(f"{relative_path}: required file is missing")
 
 
+gitnexus_path = root / ".gitnexusrc"
+require_file(".gitnexusrc")
+if gitnexus_path.is_file():
+    try:
+        gitnexus_config = json.loads(gitnexus_path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, UnicodeDecodeError) as exc:
+        errors.append(f".gitnexusrc: cannot be parsed: {exc}")
+    else:
+        analyze_config = gitnexus_config.get("analyze") if isinstance(gitnexus_config, dict) else None
+        if not isinstance(analyze_config, dict) or analyze_config.get("indexOnly") is not True:
+            errors.append(".gitnexusrc: analyze.indexOnly must be true to protect rules and skills")
+
+
 index_path = root / ".agents/skills/INDEX.md"
 require_file(".agents/skills/INDEX.md")
 
 actual_skills = {
-    path.parent.name
-    for path in (root / ".agents/skills").glob("*/SKILL.md")
+    path.parent.relative_to(root / ".agents/skills").as_posix()
+    for path in (root / ".agents/skills").rglob("SKILL.md")
     if path.is_file()
 }
 
@@ -76,17 +89,26 @@ for relative_path in (
     require_file(relative_path)
 
 agents_path = root / "AGENTS.md"
-if not agents_path.is_symlink() or os.readlink(agents_path) != "CLAUDE.md":
-    errors.append("AGENTS.md: must be a compatibility symlink to CLAUDE.md")
+if agents_path.is_symlink() or (agents_path.is_file() and not agents_path.read_text(encoding="utf-8").startswith("# ")):
+    errors.append("AGENTS.md: must be the canonical regular Markdown file")
 
 claude_path = root / "CLAUDE.md"
-if claude_path.is_file():
-    agents_text = claude_path.read_text(encoding="utf-8")
-    referenced_agents = set(re.findall(r"`([^`\n]*AGENTS\.md)`", agents_text))
+if claude_path.is_symlink() or (claude_path.is_file() and claude_path.read_text(encoding="utf-8").strip() != "@AGENTS.md"):
+    errors.append("CLAUDE.md: must contain only @AGENTS.md")
+
+if agents_path.is_file():
+    agents_text = agents_path.read_text(encoding="utf-8")
+    referenced_agents = set(re.findall(r"\]\(([^)\n]*AGENTS\.md)\)", agents_text))
     for relative_path in sorted(referenced_agents):
-        if "*" in relative_path or relative_path == "AGENTS.md":
-            continue
         require_file(relative_path)
+    local_agents = {
+        path.relative_to(root).as_posix()
+        for parent in (root / "apps", root / "server")
+        for path in parent.glob("**/AGENTS.md")
+        if not any(part in {"node_modules", ".godot", "build", "dist"} for part in path.relative_to(root).parts)
+    }
+    for relative_path in sorted(local_agents - referenced_agents):
+        errors.append(f"{relative_path}: local entry is missing from root AGENTS.md")
 
 package_path = root / "package.json"
 require_file("package.json")
@@ -109,6 +131,6 @@ if errors:
 
 print(
     "PASS: agent harness is consistent "
-    f"({len(actual_skills)} skills, 5 compatibility links)"
+    f"({len(actual_skills)} skills, 4 skill links, canonical AGENTS + CLAUDE reference)"
 )
 PY
