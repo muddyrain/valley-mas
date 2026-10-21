@@ -14,12 +14,15 @@ const Title = preload("res://ui/title_screen.gd")
 const TodayAction = preload("res://ui/today_action_screen.gd")
 const ShelterView = preload("res://ui/shelter_view.gd")
 const CampHUDRoot = preload("res://ui/camp_hud/camp_hud_root.tscn")
+const RunEndScreen = preload("res://ui/run_end_screen.gd")
 const CampMenuOverlay = preload("res://ui/camp_menu_overlay.gd")
+const CampPreparation = preload("res://ui/camp_preparation.gd")
 const LoadingScreenV2 = preload("res://scenes/loading/LoadingScreenV2.tscn")
 const RuntimeLoading = preload("res://ui/runtime_loading_overlay.gd")
 const LoadProfile = preload("res://core/runtime_load_profile.gd")
 const MapProvider = preload("res://maps/expedition/expedition_map_provider.gd")
 var selected_member := ""
+var preparation: Control
 var catalog := Catalog.new()
 var ledger := Ledger.new()
 var campaign: RefCounted
@@ -75,6 +78,7 @@ func _fullscreen_camp() -> void:
 	view.select("")
 
 func _clear_camp() -> void:
+	close_preparation(false)
 	if is_instance_valid(camp_view):
 		camp_view.get_parent().remove_child(camp_view)
 		camp_view.queue_free()
@@ -151,6 +155,14 @@ func _ready() -> void:
 func _input(event: InputEvent) -> void:
 	if not event is InputEventKey or not event.pressed or event.echo:
 		return
+	if event.physical_keycode == KEY_ESCAPE and is_instance_valid(preparation):
+		preparation.cancel_or_close()
+		get_viewport().set_input_as_handled()
+		return
+	if event.physical_keycode == KEY_I and state == "shelter" and not is_instance_valid(camp_menu_overlay):
+		open_preparation()
+		get_viewport().set_input_as_handled()
+		return
 	if event.physical_keycode == KEY_ESCAPE and is_instance_valid(camp_menu_overlay):
 		close_camp_menu_overlay()
 		get_viewport().set_input_as_handled()
@@ -197,6 +209,7 @@ func member_names(ids: Array) -> String:
 	return "、".join(names) if not names.is_empty() else "无"
 
 func _clear_screen() -> void:
+	close_preparation(false)
 	_clear_camp_menu_overlay(false)
 	if is_instance_valid(screen) and screen != camp_ui:
 		screen.get_parent().remove_child(screen)
@@ -282,7 +295,68 @@ func show_shelter() -> void:
 		camp_ui.depart_requested.connect(show_today_action)
 		camp_ui.menu_requested.connect(show_main_menu)
 		camp_ui.camp_menu_requested.connect(open_camp_menu_overlay)
+		camp_ui.preparation_requested.connect(open_preparation)
 		screen = camp_ui
+	else:
+		_clear_mission()
+		var ending := RunEndScreen.new()
+		ui_layer.add_child(ending)
+		ending.new_run_requested.connect(confirm_new_run)
+		ending.main_menu_requested.connect(show_main_menu)
+		ending.setup(campaign)
+		screen = ending
+
+func open_preparation(member_id: String = "", page: String = "inventory") -> void:
+	if state != "shelter" or is_instance_valid(camp_menu_overlay) or is_instance_valid(preparation):
+		return
+	preparation = CampPreparation.new()
+	ui_layer.add_child(preparation)
+	preparation.closed.connect(close_preparation)
+	preparation.operation_requested.connect(apply_preparation_action)
+	preparation.effect_requested.connect(apply_preparation_effect)
+	preparation.setup(self, member_id, page)
+	camp_view.interaction_locked = true
+	camp_ui.process_mode = Node.PROCESS_MODE_DISABLED
+
+func close_preparation(restore_input: bool = true) -> void:
+	if is_instance_valid(preparation):
+		preparation.get_parent().remove_child(preparation)
+		preparation.queue_free()
+	preparation = null
+	if restore_input and state == "shelter":
+		if is_instance_valid(camp_view):
+			camp_view.interaction_locked = false
+		if is_instance_valid(camp_ui):
+			camp_ui.process_mode = Node.PROCESS_MODE_INHERIT
+			camp_ui.preparation_button.grab_focus.call_deferred()
+
+func apply_preparation_action(action: String, member_id: String, uid: String, expected: Dictionary) -> bool:
+	# A confirmation belongs to one exact Campaign revision, including after rollback/restore.
+	if state != "shelter" or campaign.data != expected:
+		return false
+	if action != "buy" and member_id not in campaign.data.members:
+		return false
+	if action == "buy" and not member_id.is_empty():
+		return false
+	match action:
+		"equip": return equip_member(member_id, uid)
+		"unequip": return unequip_member(member_id)
+		"buy": return buy_weapon(uid)
+		"train": return train_member(member_id)
+	return false
+
+func _refresh_preparation() -> void:
+	if is_instance_valid(camp_view):
+		camp_view.refresh_members(campaign)
+	if is_instance_valid(camp_ui):
+		camp_ui.refresh_roster()
+	if is_instance_valid(preparation):
+		preparation.refresh()
+
+func apply_preparation_effect(category: String, previous: String, replacement: String, expected: Dictionary) -> bool:
+	if state != "shelter" or campaign.data != expected:
+		return false
+	return replace_camp_effect(category, previous, replacement)
 
 func open_camp_menu_overlay() -> void:
 	if state != "shelter" or not is_instance_valid(camp_ui) or is_instance_valid(camp_menu_overlay):
@@ -411,13 +485,17 @@ func select_member(id: String) -> void:
 	get_camp_view().select(id)
 	camp_ui.show_survivor(id)
 
-func train_member(id: String) -> void:
+func train_member(id: String) -> bool:
 	if state != "shelter":
-		return
+		return false
 	var before: Dictionary = campaign.data.duplicate(true)
-	if campaign.train(id) and _save(before):
+	if not campaign.train(id):
+		return false
+	var success: bool = _save(before)
+	if success:
 		status_message = "%s · 已升至 %d 级" % [member_name(id), campaign.member_level(id)]
-	show_shelter()
+	_refresh_preparation()
+	return success
 
 func _save(before: Dictionary = {}) -> bool:
 	var message: String = store.write(campaign.data, campaign.valid_state)
@@ -436,29 +514,35 @@ func _save(before: Dictionary = {}) -> bool:
 		return false
 	return true
 
-func equip_member(member: String, uid: String) -> void:
-	if state != "shelter":
-		return
+func equip_member(member: String, uid: String) -> bool:
+	if state != "shelter" or campaign.data.equipment.get(member, "") == uid:
+		return false
 	var before: Dictionary = campaign.data.duplicate(true)
-	if campaign.equip(member, uid):
-		_save(before)
-	show_shelter()
+	if not campaign.equip(member, uid):
+		return false
+	var success: bool = _save(before)
+	_refresh_preparation()
+	return success
 
-func unequip_member(member: String) -> void:
-	if state != "shelter":
-		return
+func unequip_member(member: String) -> bool:
+	if state != "shelter" or str(campaign.data.equipment.get(member, "")).is_empty():
+		return false
 	var before: Dictionary = campaign.data.duplicate(true)
-	if campaign.unequip_weapon(member):
-		_save(before)
-	show_shelter()
+	if not campaign.unequip_weapon(member):
+		return false
+	var success: bool = _save(before)
+	_refresh_preparation()
+	return success
 
-func buy_weapon(uid: String) -> void:
+func buy_weapon(uid: String) -> bool:
 	if state != "shelter":
-		return
+		return false
 	var before: Dictionary = campaign.data.duplicate(true)
-	if campaign.buy(uid):
-		_save(before)
-	show_shelter()
+	if not campaign.buy(uid):
+		return false
+	var success: bool = _save(before)
+	_refresh_preparation()
+	return success
 
 func set_effect_equipped(category: String, id: String, equipped: bool) -> void:
 	if state != "shelter":
@@ -470,20 +554,18 @@ func set_effect_equipped(category: String, id: String, equipped: bool) -> void:
 	show_shelter()
 	screen.show_effects()
 
-func replace_camp_effect(category: String, previous: String, replacement: String) -> void:
+func replace_camp_effect(category: String, previous: String, replacement: String) -> bool:
 	if state != "shelter" or category not in ["passive", "power"]:
-		return
+		return false
 	var before: Dictionary = campaign.data.duplicate(true)
 	if not previous.is_empty() and not campaign.unequip_effect(category, previous):
-		return
+		return false
 	if not replacement.is_empty() and not campaign.equip_effect(category, replacement):
 		campaign.data = before
-		return
-	_save(before)
-	camp_ui.close_context()
-	show_shelter()
-	if not replacement.is_empty():
-		camp_ui.show_effect_detail(category, replacement, true)
+		return false
+	var success: bool = _save(before)
+	_refresh_preparation()
+	return success
 
 func debug_effects(upgrade_owned: bool) -> void:
 	if state != "shelter":

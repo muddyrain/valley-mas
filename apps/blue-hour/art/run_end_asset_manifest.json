@@ -1,0 +1,57 @@
+{
+  "task": "P1-B-VISUAL",
+  "date": "2026-10-20",
+  "engine": "Godot 4.7.2 / Compatibility",
+  "visualTarget": "Left 44% quiet homeward illustration and native brand; right 52% heavy heading, layered ivory paper, navy symbols, photo cards and matched chamfer buttons. Native live text only.",
+  "generatedBackground": {
+    "path": "assets/ui/run_end/run_end_homeward_background.png",
+    "nativeSize": [1672, 941],
+    "alpha": false,
+    "source": "Built-in image_gen, exec-5cc10a80-4ce2-446c-ad89-31b66f6aef3c.png; new generation without image inputs",
+    "prompt": "Production background illustration asset for the original anime survival game BLUE HOUR: HOMEWARD, a clean standalone painted game background, NOT a UI mockup. Widescreen 16:9, ideally 2560x1440. On the LEFT 40 percent: a parked small civilian evacuation bus cropped along the far-left edge under a weathered canvas awning, a warm amber lantern, stacked travel bags, practical supply crates and a sleeping calico cat; two anonymous adult anime survivors in modest practical outdoor jackets seen only from behind, seated together quietly looking across a river at distant city silhouettes after returning home. No visible faces, no text on props. Delicate anime film background painting, detailed hand painted materials, restrained deep navy and slate-blue palette, lavender cloud edges, a narrow peach-gold dusk horizon, tiny warm lights and water reflections. Gentle resilience after a hard journey, intimate and quiet. The LEFT foreground figures and bus form a beautiful readable silhouette; leave the upper-left area sufficiently dark and uncluttered for an external game logo. The RIGHT 60 percent must be calm open blue twilight sky and quiet hazy distant water/buildings, very low contrast, low detail, with no foreground people or objects, so external native UI can cover it. Strong asymmetric composition intentionally designed for a large paper results panel on the right. Use one coherent panoramic illustration, full bleed. Absolutely NO letters, numbers, logos, watermarks, interface elements, title text, buttons, paper panels, card frames, borders or collage, and no readable signage. Do not reproduce any complete game screenshot.",
+    "edits": "None; original PNG bytes copied into project",
+    "use": "Both outcomes and decorative postcard crop; KEEP_ASPECT_COVERED at runtime; saturation/exposure shader varies mood",
+    "approval": "Native integration verified separately; user visual approval pending",
+    "restrictions": [
+      "No baked text, logo, UI or data",
+      "Decorative anonymous travelers are not the Run roster"
+    ]
+  },
+  "vectors": [
+    {
+      "path": "assets/ui/run_end/run_end_heading_crest.svg",
+      "role": "Lighthouse/mountain title ornament",
+      "source": "Original code-authored SVG; no text"
+    },
+    {
+      "path": "assets/ui/run_end/run_end_symbols.svg",
+      "role": "Semantic calendar/members/food/scrap/home/arrow/warning atlas",
+      "source": "Original code-authored SVG; no text"
+    },
+    {
+      "path": "assets/ui/common/cards/ui_common_status_brush.svg",
+      "role": "Reusable blank status brush, native Label overlaid",
+      "source": "Original code-authored SVG; no text"
+    },
+    {
+      "path": "assets/ui/common/cards/ui_common_washi_tape.svg",
+      "role": "Reusable translucent washi strip",
+      "source": "Original code-authored SVG; no text"
+    },
+    {
+      "path": "assets/ui/common/buttons/ui_common_chamfer_focus.svg",
+      "role": "Reusable inset keyboard focus outline",
+      "source": "Original code-authored SVG; no text"
+    }
+  ],
+  "reused": [
+    "assets/ui/common/branding/ui_common_logo_tagline.png",
+    "assets/ui/common/cards/ui_common_card_paper.png",
+    "assets/ui/today_action/today_action_button_blue.png",
+    "assets/ui/today_action/today_action_button_green.png",
+    "SurvivorDefinition.portrait_path; assets/characters/<character_id>/portrait/avatar_square.png"
+  ],
+  "fonts": "Existing SystemFont strategy; SimHei/Microsoft YaHei headline with FontVariation embolden; existing body fonts; KaiTi/STKaiti/serif fallback for handwritten atmosphere. No font binaries copied.",
+  "import": "2D lossless, linear filtering; source artwork unmodified; no Blender or model work.",
+  "pipeline": "Generate once -> inspect -> copy exact source PNG -> native Godot import -> native sizes/focus/data regressions -> full Windows build gate."
+}

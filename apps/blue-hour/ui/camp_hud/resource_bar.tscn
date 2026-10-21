@@ -87,7 +87,7 @@ offset_bottom = 51.0
 mouse_filter = 2
 theme_override_fonts/font = SubResource("ResourceValue")
 theme_override_font_sizes/font_size = 23
-text = "10"
+text = "—"
 vertical_alignment = 1
 
 [node name="ResourceScrap" type="Control" parent="."]
@@ -135,7 +135,7 @@ offset_bottom = 51.0
 mouse_filter = 2
 theme_override_fonts/font = SubResource("ResourceValue")
 theme_override_font_sizes/font_size = 23
-text = "60"
+text = "—"
 vertical_alignment = 1
 
 [node name="ResourceIntel" type="Control" parent="."]
@@ -183,7 +183,7 @@ offset_bottom = 51.0
 mouse_filter = 2
 theme_override_fonts/font = SubResource("ResourceValue")
 theme_override_font_sizes/font_size = 23
-text = "3"
+text = "—"
 vertical_alignment = 1
 
 [node name="MenuButton" type="Button" parent="."]

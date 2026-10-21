@@ -115,7 +115,7 @@ offset_bottom = 80.0
 mouse_filter = 2
 theme_override_fonts/font = SubResource("Day")
 theme_override_font_sizes/font_size = 17
-text = "DAY 01"
+text = "—"
 vertical_alignment = 1
 
 [node name="DayCn" type="Label" parent="CampInfoPanel"]
@@ -126,7 +126,7 @@ offset_bottom = 75.0
 mouse_filter = 2
 theme_override_fonts/font = SubResource("Strong")
 theme_override_font_sizes/font_size = 19
-text = "第 1 天"
+text = "—"
 vertical_alignment = 1
 horizontal_alignment = 2
 
@@ -138,7 +138,7 @@ offset_bottom = 114.0
 mouse_filter = 2
 theme_override_fonts/font = SubResource("Body")
 theme_override_font_sizes/font_size = 15
-text = "新的旅程，"
+text = "—"
 vertical_alignment = 1
 theme_override_colors/font_color = Color(0.19, 0.29, 0.39, 1)
 
@@ -150,6 +150,6 @@ offset_bottom = 141.0
 mouse_filter = 2
 theme_override_fonts/font = SubResource("Body")
 theme_override_font_sizes/font_size = 15
-text = "从这里出发。"
+text = "—"
 vertical_alignment = 1
 theme_override_colors/font_color = Color(0.19, 0.29, 0.39, 1)

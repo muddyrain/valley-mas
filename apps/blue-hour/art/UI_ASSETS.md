@@ -1,5 +1,13 @@
 # 首页、路线与今日行动素材
 
+## Run 结束页视觉精修（2026-10-20～21）
+
+P1-B-VISUAL 使用独立、无 UI 的归航插画 `assets/ui/run_end/run_end_homeward_background.png`（1672×941），由本轮 built-in image_gen 新生成，未使用参考设计稿作为贴图或编辑输入，原 PNG 字节直接入库；胜败共用，通过表现 Shader 调整饱和度与明暗。插画内匿名旅人只表达氛围，不是本轮成员名单。完整提示词、来源、尺寸与使用限制见 [独立资产清单](run_end_asset_manifest.json)。
+
+新增五个无文字 SVG：结束页灯塔山线装饰、语义图标 atlas，以及可复用的空白笔刷印章、半透明胶带、切角焦点轮廓。它们分别位于 `assets/ui/run_end/`、`assets/ui/common/cards/` 和 `assets/ui/common/buttons/`，均为本轮原创矢量绘制；状态、资源数值和操作文字全部由原生 Godot 控件渲染。纸张继续使用正式 `ui_common_card_paper.png`，按钮复用今日行动 blue / green 两张空白底图，Logo 与正式角色头像保持原资源。
+
+标题沿用 SystemFont 生产方式，使用 SimHei / Microsoft YaHei 等系统字形并做 FontVariation 加粗；正文复用既有字体策略，情绪短句使用 KaiTi / serif 系统回退。没有复制系统字体文件，没有新增角色 / 动画 / 地图资源。原生截图与视觉、工程两类验收见 [本轮报告](../docs/reports/2026-10-21_p1_b_visual_refinement_report.md)。
+
 ## Expedition 搜索状态卡（2026-09-17）
 
 用户提供 `蓝时归航_Expedition_搜索状态卡_V1_UI素材包.zip`，四张原始 PNG 保存于 `assets/ui/expedition/search/`，Godot Lossless 导入；预览仅用于布局对照，不作为运行时整图。

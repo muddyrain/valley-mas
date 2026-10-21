@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="448" height="64" viewBox="0 0 448 64">
+<g fill="#fff">
+<g transform="translate(0)"><rect x="9" y="14" width="46" height="42" rx="4"/><rect x="18" y="6" width="5" height="18" rx="2"/><rect x="41" y="6" width="5" height="18" rx="2"/><path d="M9 27h46" stroke="#fff" stroke-width="3"/><g fill="#1b3654"><rect x="19" y="32" width="6" height="6"/><rect x="31" y="32" width="6" height="6"/><rect x="43" y="32" width="6" height="6"/><rect x="19" y="44" width="6" height="6"/><rect x="31" y="44" width="6" height="6"/></g></g>
+<g transform="translate(64)"><circle cx="22" cy="20" r="10"/><circle cx="46" cy="23" r="8"/><path d="M4 55V43a18 18 0 0 1 36 0v12Zm39 0V43a21 21 0 0 0-3-11 14 14 0 0 1 20 13v10Z"/></g>
+<g transform="translate(128)"><path d="M13 16v36c0 9 38 9 38 0V16Z"/><ellipse cx="32" cy="15" rx="19" ry="8"/><ellipse cx="32" cy="15" rx="13" ry="4" fill="#1b3654"/><path d="m31 27-6 10 7 2-3 10 10-14-8-2 5-6Z" fill="#1b3654"/></g>
+<g transform="translate(192)"><path d="m25 3 14 0 2 8 7 3 7-4 7 12-6 6v8l6 5-7 12-8-3-7 4-1 8H25l-2-8-7-4-7 3-7-12 6-6v-8l-6-5 7-12 8 3 7-4Z"/><circle cx="32" cy="32" r="12" fill="#1b3654"/></g>
+<g transform="translate(256)"><path d="m3 29 29-24 29 24-5 6-24-20L8 35Zm9 5 20-17 20 17v25H39V40H25v19H12Z"/></g>
+<g transform="translate(320)" fill="none" stroke="#fff" stroke-width="7" stroke-linejoin="miter"><path d="m10 14 17 18-17 18m23-36 17 18-17 18"/></g>
+<g transform="translate(384)"><path d="M27 7a6 6 0 0 1 10 0l26 46a6 6 0 0 1-5 8H6a6 6 0 0 1-5-8Z"/><path d="M29 21h6v20h-6Zm0 26h6v6h-6Z" fill="#1b3654"/></g>
+</g></svg>

@@ -3,9 +3,9 @@ extends "res://tests/camp_hud_skeleton_runtime.gd"
 const CAPTURE_DIR := "res://test-output/camp-resource-bar-frozen/"
 const ITEMS := ["ResourceFood", "ResourceScrap", "ResourceIntel", "MenuButton"]
 const COPY := {
-	"ResourceFood/Label": "食物", "ResourceFood/Value": "10",
-	"ResourceScrap/Label": "废料", "ResourceScrap/Value": "60",
-	"ResourceIntel/Label": "情报", "ResourceIntel/Value": "3",
+	"ResourceFood/Label": "食物", "ResourceFood/Value": "6",
+	"ResourceScrap/Label": "废料", "ResourceScrap/Value": "0",
+	"ResourceIntel/Label": "情报", "ResourceIntel/Value": "—",
 	"MenuButton/LabelCn": "菜单", "MenuButton/LabelEn": "MENU",
 }
 
@@ -74,7 +74,7 @@ func run() -> void:
 		var screenshot: Image = root.get_texture().get_image()
 		check(screenshot.get_size() == dimensions, "Native screenshot dimensions")
 		check(screenshot.save_png(CAPTURE_DIR + "camp-%dx%d.png" % [dimensions.x, dimensions.y]) == OK, "Native screenshot saved")
-	check(app.campaign.data == before, "Fixed resource display does not mutate gameplay")
+	check(app.campaign.data == before, "Bound resource display does not mutate gameplay")
 	check(app.camp_view.camera.global_transform == camera, "Camera unchanged")
 	var report := FileAccess.open(CAPTURE_DIR + "runtime.json", FileAccess.WRITE)
 	report.store_string(JSON.stringify({"checks": checks, "failures": failures, "layouts": layouts}, "\t"))

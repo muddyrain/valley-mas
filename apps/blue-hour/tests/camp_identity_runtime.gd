@@ -4,7 +4,7 @@ const CAPTURE_DIR := "res://test-output/camp-identity-frozen/"
 const COPY := {
 	"CampNameCn": "东岸营地", "CampNameEn": "EAST COAST CAMP",
 	"DayEn": "DAY 01", "DayCn": "第 1 天",
-	"DescriptionLine1": "新的旅程，", "DescriptionLine2": "从这里出发。",
+	"DescriptionLine1": "口粮储备充足", "DescriptionLine2": "今晚需 2 食物",
 }
 
 func run() -> void:
