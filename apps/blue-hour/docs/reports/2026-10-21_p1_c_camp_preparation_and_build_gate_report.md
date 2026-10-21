@@ -118,7 +118,7 @@ pwsh -NoProfile -File "$P/run.ps1" -Mode build -GodotPath $Godot
 完整调用未跳过任何原有门禁，结果为 **FAIL**，989.325 秒、exit1。按执行顺序通过导入、P1-A 62 / 186、整备 55、P1-B 138 / 500 / 366 / 133、搜索72、外出 HUD265、指令45、指令线554、搜索卡157、设置14、营地菜单30、当前 Camp UI272、HUD269，随后到旧 `tests/camp_departure.gd`：
 
 - 第34 / 35行仍用旧“今日行动”“商业街”按钮文字定位，两个 Visible input target 失败；第41行对空按钮调用 get_global_rect，后续演出断言没有执行；脚本计时退出2，PowerShell正常拒绝继续。
-- 当前生产入口为 M08 / TodayAction 卡片和确认按钮。`Main.start_mission` 使用现存 RuntimeLoadingOverlay；[加载契约报告](../EXPEDITION_RUNTIME_LOADING_REPORT.md)明确该入口已替换先走 Camp 登车演出再淡黑的流程。本轮 177 项与构建内272项已通过真实选择、加载、到场和后续 Mission，不能把旧测试定位失败说成正式出发完全不可用。
+- 当前生产入口为 M08 / TodayAction 卡片和确认按钮。`Main.start_mission` 使用现存 RuntimeLoadingOverlay；[加载契约报告](../archive/2026-10/stages/EXPEDITION_RUNTIME_LOADING_REPORT.md)明确该入口已替换先走 Camp 登车演出再淡黑的流程。本轮 177 项与构建内272项已通过真实选择、加载、到场和后续 Mission，不能把旧测试定位失败说成正式出发完全不可用。
 - 属于旧定位（分类2）及后续历史演出预期（分类3）的混合脚本。没有在这轮恢复旧动画 / 设施，也没有删其断言或绕过它导出。后续 Camp / World / 武器等完整门禁和导出没有执行；不能推断它们会通过。
 - 完整链中整备55项、原生共享路线176项执行后，额外补充了转交回滚 / 未知商品及射程 / 换弹验证；最终59 / 177在独立组重新通过。构建内 Camp UI总272是当时版本，不能混写为273。生产实现与最终验证副本字节一致，补充测试没有更改规则或生产行为。
 

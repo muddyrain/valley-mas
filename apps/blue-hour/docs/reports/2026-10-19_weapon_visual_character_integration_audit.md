@@ -24,7 +24,7 @@
 | `weapon_system_audit_w3_0.md` | 当前仓库文档中未找到，不能引用其完成结论。 |
 | `weapon_system_w3_2_camp_inventory_equip_report.md` | 未找到；以实际 Camp UI、Campaign 和实例链重审。 |
 | `weapon_system_w3_3_vehicle_loot_report.md` | 未找到；以 Mission 当前掉落分支及活动池重审。 |
-| Survivor Animation V1 收口 | 指定标题没有独立匹配文件；已读 [Run／Death Phase 2.1](2026-09-24_survivor_animation_run_death_phase_2_1_report.md)、[Phase 3 Batch Reuse](2026-09-24_survivor_animation_phase_3_batch_reuse_report.md)，并对照更早 [Final Visual QA](2026-09-24_survivor_animation_phase_2_final_visual_qa_report.md) 的未通过记录。没有用早期结论覆盖当前验证。 |
+| Survivor Animation V1 收口 | 指定标题没有独立匹配文件；已读 [Run／Death Phase 2.1](../archive/2026-10/reports/2026-09-24_survivor_animation_run_death_phase_2_1_report.md)、[Phase 3 Batch Reuse](../archive/2026-10/reports/2026-09-24_survivor_animation_phase_3_batch_reuse_report.md)，并对照更早 [Final Visual QA](../archive/2026-10/reports/2026-09-24_survivor_animation_phase_2_final_visual_qa_report.md) 的未通过记录。没有用早期结论覆盖当前验证。 |
 | 2026-10-19 移动审计 | 已读 [ANIM-A0](2026-10-19_anim_a0_movement_audit.md)。审计期间新增的 [ANIM-A1](2026-10-19_anim_a1_animation_runtime_fix_report.md) 已补读；当前资源七个持续片已 Loop，Run／Rifle Run 1.45 已存在，不再重复报告 A0 的旧冻结状态为当前缺陷。 |
 | 当前 R2 | 已读 [R2](../development/blue_hour_r2_time_contract_report.md)、[R2.1](../development/blue_hour_r2_1_animation_tailstep_fix_report.md)。Mission 唯一模拟时间、有界子步、局部暂停／倍率和技能边界保持，本轮原 Time Contract 173/0。 |
 

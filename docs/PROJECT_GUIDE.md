@@ -1,6 +1,6 @@
 # Valley MAS 项目指南
 
-本页只记录可由仓库配置和目录验证的事实。协作规则见 `CLAUDE.md`，产品语义和交付状态按需读取目标子项目文档与 `docs/plans/README.md`。
+本页只记录可由仓库配置和目录验证的事实。协作规则见 `AGENTS.md`，产品语义和交付状态按需读取目标子项目文档与 `docs/plans/README.md`。
 
 ## 仓库地图
 
@@ -174,7 +174,7 @@ godot --headless --path apps/blue-hour --script tests/parallel_routes.gd
 
 所有自动化、启动检查和独立导出验证使用 `user://test-runs/` 的隔离记录，不覆盖玩家的 `user://homeward/run.json`，也不控制用户当前窗口。当前只在安全屋与待结算节点保存；行动中退出后重试当天，装备奖励保持固定。
 
-`[Windows]` `build` 使用匹配引擎版本的 Windows x64 模板，先执行导入及上述模型与玩法测试，再通过 `Windows Desktop` 预设导出资源内嵌的 `apps/blue-hour/build/BlueHourHomeward.exe`。随后将 EXE 复制到独立验证目录，在不带源码和独立 PCK 的情况下分别完成基地、主菜单的 Headless 与屏幕外原生启动，以及内嵌模型检查，成功后记录 `BUILD-INFO.json`。试玩只需该 EXE，无需 Godot 编辑器；每次功能交付都更新构建。Debug Menu 在当前试玩构建中保留。
+`[Windows]` `build` 使用匹配引擎版本的 Windows x64 模板，先执行导入及上述模型与玩法测试，再通过 `Windows Desktop` 预设导出资源内嵌的 `apps/blue-hour/build/BlueHourHomeward.exe`。随后将 EXE 复制到独立验证目录，在不带源码和独立 PCK 的情况下分别完成基地、主菜单的 Headless 与屏幕外原生启动，以及内嵌模型检查，成功后记录 `BUILD-INFO.json`。试玩只需该 EXE，无需 Godot 编辑器；Windows 试玩/发布交付或导出配置、平台集成变化时更新构建。日常源码迭代在可用环境执行受影响专项，并如实标注发布验证范围。Debug Menu 在当前试玩构建中保留。
 
 范围、操作与资源入口见 [蓝时归航 README](../apps/blue-hour/README.md)，实际验证记录见 [VALIDATION](../apps/blue-hour/docs/VALIDATION.md)。缓存、构建与本地验证产物由项目 `.gitignore` 排除。
 

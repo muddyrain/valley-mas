@@ -1,6 +1,6 @@
 # 资源目录与新增归属
 
-2026-09-12 完成目录整理及文件命名规范化。目录迁移历史见 [目录迁移记录](../docs/ASSET_MIGRATION_2026-09-12.md)，当前文件名及完整映射见 [命名迁移记录](../docs/ASSET_NAMING_2026-09-12.md)。
+2026-09-12 完成目录整理及文件命名规范化。目录迁移历史见 [目录迁移记录](../docs/archive/2026-10/stages/ASSET_MIGRATION_2026-09-12.md)，当前文件名及完整映射见 [命名迁移记录](../docs/archive/2026-10/stages/ASSET_NAMING_2026-09-12.md)。
 
 ```text
 assets/
@@ -64,9 +64,9 @@ assets/
 
 ## 来源与导入
 
-2026-09-12 营地主站保留用户指定名称 `CAMP_001_main_station.glb`，归 `assets/world/buildings/`；不增加版本后缀。与蓝时号一样保留 Godot 自动提取的相邻 `Image_N` 纹理名和导入参数，唯一运行场景为 `scenes/camp/buildings/camp_main_station.tscn`。原件哈希、尺寸、简单碰撞与冻结布局验证见 [营地主站与出发报告](../docs/CAMP_DEPARTURE_V1.md)。
+2026-09-12 营地主站保留用户指定名称 `CAMP_001_main_station.glb`，归 `assets/world/buildings/`；不增加版本后缀。与蓝时号一样保留 Godot 自动提取的相邻 `Image_N` 纹理名和导入参数，唯一运行场景为 `scenes/camp/buildings/camp_main_station.tscn`。原件哈希、尺寸、简单碰撞与冻结布局验证见 [营地主站与出发报告](../docs/archive/2026-10/stages/CAMP_DEPARTURE_V1.md)。
 
-2026-09-13 Phase 2A-Rebuild 继续沿用 `characters/<对象>/model/` 边界，正式文件名仍为 `ENM_001_infected_basic_a.glb`；该文件现在是用户提供的新版 A-pose GLB，旧字节归档到 `legacy/`。材质与三张贴图由 Godot 从新 GLB 导入，来源与哈希见 [感染者来源表](infected_source.json)；尺寸、模型朝向和碰撞高度由唯一敌人场景维护，运行时代码不缩放模型。定义、Rig、动作与验证入口见 [普通感染者规格](../docs/ENEMY_DEFINITION.md) 和 [重建报告](../docs/ENM_001_NEW_A_POSE_ASSET_REBUILD_REPORT.md)。
+2026-09-13 Phase 2A-Rebuild 继续沿用 `characters/<对象>/model/` 边界，正式文件名仍为 `ENM_001_infected_basic_a.glb`；该文件现在是用户提供的新版 A-pose GLB，旧字节归档到 `legacy/`。材质与三张贴图由 Godot 从新 GLB 导入，来源与哈希见 [感染者来源表](infected_source.json)；尺寸、模型朝向和碰撞高度由唯一敌人场景维护，运行时代码不缩放模型。定义、Rig、动作与验证入口见 [普通感染者规格](../docs/archive/2026-10/stages/ENEMY_DEFINITION.md) 和 [重建报告](../docs/archive/2026-10/missing-sources.md#enm-001-new-a-pose-asset-rebuild-report)。
 
 2026-09-12 道具/技能扩充原样导入用户提供的 14 张 100×100 PNG，原始文件名、项目路径与 SHA-256 见 [图标来源表](effect_icon_sources.json)。分别归入 `items/icons/` 与 `skills/icons/`，定义直接持有 Texture2D 引用；技能使用 `action_icon` 区分既有路线装饰图标。中文文件名仅作来源记录，稳定业务 ID 与文件名分离。病床、购物篮、报纸未出现在此次提供目录中，未新增其玩法或内容注册。
 
@@ -76,6 +76,6 @@ assets/
 
 删除前还需区分未加载的源素材与已经废弃的成品。未确认废弃的原图、分层组件及设计资料保留；本次没有清理 `docs/`、`references/` 或 Blender 源文件。
 
-武器图标由用户提供，字节校验见 [来源清单](weapon_icon_sources.json)，使用与后续模型接口见 [武器系统](../docs/WEAPON_SYSTEM.md)。旧 generated 武器继续保留在资产库，正式装备不再附着旧 Demo 模型。
+武器图标由用户提供，字节校验见 [来源清单](weapon_icon_sources.json)，使用与后续模型接口见 [武器系统](../docs/archive/2026-10/stages/WEAPON_SYSTEM.md)。旧 generated 武器继续保留在资产库，正式装备不再附着旧 Demo 模型。
 
-上述 4 个旧 GLB 的外部材质规则属于命名迁移时的处理记录。A-Pose 角色替换后的当前规则见 [角色替换报告](../docs/CHARACTER_REPLACEMENT_REPORT.md)：先验证新模型、显式更新引用，再清理已废弃角色资产；其他美术源素材不受影响。
+上述 4 个旧 GLB 的外部材质规则属于命名迁移时的处理记录。A-Pose 角色替换后的当前规则见 [角色替换报告](../docs/archive/2026-10/stages/CHARACTER_REPLACEMENT_REPORT.md)：先验证新模型、显式更新引用，再清理已废弃角色资产；其他美术源素材不受影响。

@@ -27,17 +27,17 @@ P1-B-VISUAL 使用独立、无 UI 的归航插画 `assets/ui/run_end/run_end_hom
 
 ## Camp M04 幸存者头像列表（2026-09-18）
 
-用户 `m04_assets_final.zip` 三张原始 PNG 位于 `assets/ui/camp/m04/`，SHA-256 与包内原件一致；背景 236×872 → 118×436，normal / selected frame 188×188 → 94×94，保持原比例。头像复用现有苏晚星、夏知遥 portrait，以 AtlasTexture 取面部后显示 78×78，原件不改；四槽暂按苏/夏/苏/夏排列。文字与圆点由 Godot 渲染，没有额外星标或装饰。结构、选择边界和验证见 [M04 接入报告](../docs/CAMP_SURVIVOR_ROSTER_REPORT.md)。
+用户 `m04_assets_final.zip` 三张原始 PNG 位于 `assets/ui/camp/m04/`，SHA-256 与包内原件一致；背景 236×872 → 118×436，normal / selected frame 188×188 → 94×94，保持原比例。头像复用现有苏晚星、夏知遥 portrait，以 AtlasTexture 取面部后显示 78×78，原件不改；四槽暂按苏/夏/苏/夏排列。文字与圆点由 Godot 渲染，没有额外星标或装饰。结构、选择边界和验证见 [M04 接入报告](../docs/archive/2026-10/stages/CAMP_SURVIVOR_ROSTER_REPORT.md)。
 
 ## Camp M03 顶部资源栏（2026-09-17）
 
-用户 `m03_assets_final.zip` 六张 PNG 原字节保存于 `assets/ui/camp/m03/`，逐张 SHA-256 与原包一致。资源背景 206×112 → 103×56，三个资源图标 64×64 → 30×30，菜单背景 232×112 → 116×56，菜单图标 48×48 → 24×24。背景共用，文字由 Godot Label 渲染；无额外 PNG 或 gameplay 接入。尺寸、节点与验证见 [M03 接入报告](../docs/CAMP_RESOURCE_BAR_REPORT.md)。
+用户 `m03_assets_final.zip` 六张 PNG 原字节保存于 `assets/ui/camp/m03/`，逐张 SHA-256 与原包一致。资源背景 206×112 → 103×56，三个资源图标 64×64 → 30×30，菜单背景 232×112 → 116×56，菜单图标 48×48 → 24×24。背景共用，文字由 Godot Label 渲染；无额外 PNG 或 gameplay 接入。尺寸、节点与验证见 [M03 接入报告](../docs/archive/2026-10/stages/CAMP_RESOURCE_BAR_REPORT.md)。
 
 ## Camp M02 时间状态栏（2026-09-17）
 
 用户 `m02_assets_final.zip` 原件保存于 `assets/ui/camp/m02/`：`m02_status_bar_bg.png`（1136×152）等比显示 568×76，`m02_icon_sun_day.png`（64×64）等比显示 28×28。两张 SHA-256 均与包内原件一致，未重新生成或修改像素。Godot Lossless 导入、透明边缘修复与线性过滤。
 
-背景自带的两根分隔线定义左/中/右区域；轨道和四个圆形节点使用 Godot StyleBoxFlat 绘制，全部文字为独立 Label，无额外 PNG。M01 维持冻结，M03～M09 保持骨架。资源哈希、尺寸、节点及运行记录见 [M02 接入报告](../docs/CAMP_TIME_STATUS_REPORT.md)。
+背景自带的两根分隔线定义左/中/右区域；轨道和四个圆形节点使用 Godot StyleBoxFlat 绘制，全部文字为独立 Label，无额外 PNG。M01 维持冻结，M03～M09 保持骨架。资源哈希、尺寸、节点及运行记录见 [M02 接入报告](../docs/archive/2026-10/stages/CAMP_TIME_STATUS_REPORT.md)。
 
 ## Camp M01 营地身份区（2026-09-16）
 
@@ -47,7 +47,7 @@ P1-B-VISUAL 使用独立、无 UI 的归航插画 `assets/ui/run_end/run_end_hom
 
 用户提供 `blue_hour_camp_m01_assets.zip`，仅含 `camp_logo_main.png`（480×176）与 `camp_identity_panel_bg.png`（412×300）。两张 PNG 原始字节保存于 `assets/ui/camp/m01/`，已逐张 SHA-256 对照压缩包确认一致。Godot 使用 Lossless、原尺寸、透明边缘修复与线性过滤；TextureRect 等比居中显示为约 212×78 和 206×150，不裁切、不拉伸、不增加新图。
 
-M01 使用独立 Label 渲染东岸营地、中英文日期及两行描述，字体复用项目现有 SystemFont 回退方式。外层布局及 M02～M09 保持 M00。详细节点、验证与范围见 [M01 接入报告](../docs/CAMP_IDENTITY_REPORT.md)。
+M01 使用独立 Label 渲染东岸营地、中英文日期及两行描述，字体复用项目现有 SystemFont 回退方式。外层布局及 M02～M09 保持 M00。详细节点、验证与范围见 [M01 接入报告](../docs/archive/2026-10/stages/CAMP_IDENTITY_REPORT.md)。
 
 ## 今日行动选择（2026-09-12）
 
@@ -55,15 +55,15 @@ M01 使用独立 Label 渲染东岸营地、中英文日期及两行描述，字
 
 主面板使用 NinePatchRect；任务卡、顶部状态条、选中信息条和三个颜色的按钮底图使用 Godot 区域切片，去掉透明留白但不改源图。住宅区、商业街、空投回收缩略图等比覆盖卡片图片槽，图上的天空和地面会居中裁切。文字、库存、任务指标和确认/返回按钮均为原生控件。蓝色底图表示确认按钮不可用，选中后使用绿色；返回营地使用红色。
 
-复用现有首页背景、Logo、系统中文字体和 `PaperCardHover` 的纸卡抬升、按压与透明轮廓反馈。1600×900 参考画布等比完整容纳，背景覆盖其余宽高。页面逻辑、来源边界及运行证据见[今日行动记录](../docs/TODAY_ACTION.md)。
+复用现有首页背景、Logo、系统中文字体和 `PaperCardHover` 的纸卡抬升、按压与透明轮廓反馈。1600×900 参考画布等比完整容纳，背景覆盖其余宽高。页面逻辑、来源边界及运行证据见[今日行动记录](../docs/archive/2026-10/stages/TODAY_ACTION.md)。
 
-当前文件名已规范为小写语义命名，完整旧名 → 新名清单及导入验证见 [命名迁移记录](../docs/ASSET_NAMING_2026-09-12.md)。下文保留各次素材接入的来源与视觉说明。
+当前文件名已规范为小写语义命名，完整旧名 → 新名清单及导入验证见 [命名迁移记录](../docs/archive/2026-10/stages/ASSET_NAMING_2026-09-12.md)。下文保留各次素材接入的来源与视觉说明。
 
 2026-09-09，0.4.1。按用户最后提供的 1919×1080 首页设计稿接入素材。菜单、图标与文字是原生 Godot 控件；没有把整张设计稿当成可点击界面。海报按要求整张展示、不接交互。玩法继续使用 0.4.0 的开局与存档流程。
 
 ## 原图与切片
 
-首页专属的导航图标、海报和社交入口保存在 `assets/ui/main_menu/`；共享背景、品牌、纸板与按钮分别归入 `assets/ui/common/` 的对应类型目录。未修改 PNG 像素或重新生成美术。来源文件名、尺寸、SHA-256 仍见 `assets/ui/main_menu/sources.json`，其中 `file` 相对清单所在目录解析。较早的 `logo.png` 已在 2026-09-12 确认无有效引用后清理。当前目录与逐项迁移见 [资源目录说明](RESOURCE_LAYOUT.md)及[迁移记录](../docs/ASSET_MIGRATION_2026-09-12.md)。
+首页专属的导航图标、海报和社交入口保存在 `assets/ui/main_menu/`；共享背景、品牌、纸板与按钮分别归入 `assets/ui/common/` 的对应类型目录。未修改 PNG 像素或重新生成美术。来源文件名、尺寸、SHA-256 仍见 `assets/ui/main_menu/sources.json`，其中 `file` 相对清单所在目录解析。较早的 `logo.png` 已在 2026-09-12 确认无有效引用后清理。当前目录与逐项迁移见 [资源目录说明](RESOURCE_LAYOUT.md)及[迁移记录](../docs/archive/2026-10/stages/ASSET_MIGRATION_2026-09-12.md)。
 
 | 资源 | 原始尺寸 | 使用方式 |
 | --- | --- | --- |
@@ -122,13 +122,13 @@ M01 使用独立 Label 渲染东岸营地、中英文日期及两行描述，字
 
 `assets/ui/expedition/` 保留两张历史 192×192 透明模型截图头像和八张 40×40 原创线形 SVG（停止、集火、定位、集合、归航、食物、废料、装备）。来源和哈希见该目录的 `sources.json`。头像由 `art/capture_expedition_portraits.gd` 在 Godot 的离屏 SubViewport 中渲染夏知遥/苏晚星 GLB；这是历史素材，不再作为当前角色头像或 fallback。正式 Survivor 头像由 `SurvivorDefinition.portrait_path` 指向角色目录中的 PNG；没有头像的旧测试角色仍可显示姓名首字。
 
-六个技能继续使用原 100×100 正式图标；武器直接读取同期 WeaponDefinition.icon()。切角面板是共享的 Godot StyleBox 绘制，未导入 Deadly Days 图标、字体、颜色或 UI 贴图。屏幕适配与验收见 [外出视觉报告](../docs/EXPEDITION_VISUAL_REPORT.md)。
+六个技能继续使用原 100×100 正式图标；武器直接读取同期 WeaponDefinition.icon()。切角面板是共享的 Godot StyleBox 绘制，未导入 Deadly Days 图标、字体、颜色或 UI 贴图。屏幕适配与验收见 [外出视觉报告](../docs/archive/2026-10/stages/EXPEDITION_VISUAL_REPORT.md)。
 
 上述为 HUD 1 历史来源。当前正式 Expedition 已由下述 HUD 2.0 替换；旧截图资源仅保留历史来源，不参与当前头像绑定。
 
 ## Survivor 正式头像归属（2026-09-23）
 
-12 张正式 PNG 已从 `assets/ui/camp/survivor_avatars/` 迁移至各自 `assets/characters/<character_id>/portrait/avatar_square.png`，原 PNG 字节保持不变。`SurvivorDefinition.portrait_path` 是唯一头像资源引用；Camp M04、M05 与 Expedition 队员卡都消费角色数据，UI 不扫描图片目录。旧 UI 目录只保留弃用说明，具体 ID、路径和截图见 [迁移报告](../docs/reports/2026-09-23_survivor_portrait_migration_report.md)。
+12 张正式 PNG 已从 `assets/ui/camp/survivor_avatars/` 迁移至各自 `assets/characters/<character_id>/portrait/avatar_square.png`，原 PNG 字节保持不变。`SurvivorDefinition.portrait_path` 是唯一头像资源引用；Camp M04、M05 与 Expedition 队员卡都消费角色数据，UI 不扫描图片目录。旧 UI 目录只保留弃用说明，具体 ID、路径和截图见 [迁移报告](../docs/archive/2026-10/reports/2026-09-23_survivor_portrait_migration_report.md)。
 
 ## Expedition HUD 2.0 正式素材
 
@@ -136,13 +136,13 @@ M01 使用独立 Label 渲染东岸营地、中英文日期及两行描述，字
 
 六区 HUD 与 World UI 共用本套 PNG，文字、时间、HP 和搜索进度动态绘制。面板只取原边框，省去源图中固定示例条；原技能图标、武器图标与角色 portrait_path 保留。第二批 B 实际缺失，用户已同意用已提供的同义图标和按钮着色补位，未制造替代 B 包。
 
-详细来源与全部 54 项见 [PNG 清单](EXPEDITION_HUD_PNG_LIST.md)、[哈希审计](EXPEDITION_HUD_ASSET_AUDIT.json)，具体替代、键位、原生截图和构建记录见 [HUD 2.0 接入报告](../docs/EXPEDITION_HUD_2_REPORT.md)。
+详细来源与全部 54 项见 [PNG 清单](EXPEDITION_HUD_PNG_LIST.md)、[哈希审计](EXPEDITION_HUD_ASSET_AUDIT.json)，具体替代、键位、原生截图和构建记录见 [HUD 2.0 接入报告](../docs/archive/2026-10/missing-sources.md#expedition-hud-2-report)。
 
-2026-09-13 的 2.0.1 只使用运行时调色、Scale、Alpha 和布局精修；48 张 PNG 原字节保留。发光已烘焙在源图，Active 改用原 Default 外框配合动态小菱形，保留原 Active 文件。无光晕分层边框和普通地面细环仅列为未来素材建议，未擅自修改。参数与 A/B 证据见 [Visual Polish Report](../docs/EXPEDITION_HUD_2_0_1_VISUAL_POLISH_REPORT.md)。
+2026-09-13 的 2.0.1 只使用运行时调色、Scale、Alpha 和布局精修；48 张 PNG 原字节保留。发光已烘焙在源图，Active 改用原 Default 外框配合动态小菱形，保留原 Active 文件。无光晕分层边框和普通地面细环仅列为未来素材建议，未擅自修改。参数与 A/B 证据见 [Visual Polish Report](../docs/archive/2026-10/missing-sources.md#expedition-hud-2-0-1-visual-polish-report)。
 
 
 ## CAMP HUD 2.0（2026-09-13）
 
 用户提供的 CAMP 三批 44 张 PNG 原件保存在 `assets/ui/camp_hud_2_0/source/`，逐张记录原分辨率、Alpha 多阈值边界和 SHA-256。运行副本按 Alpha ≥ 8 加 4 原生像素留边无损裁切，原比例、颜色和清晰度不改；050 只取纸框、空白纸纹与 Header，避免把示例 Gameplay Icon 和占位条作为真实内容。源目录有 `.gdignore`，运行图启用 Lossless 与 mipmaps。
 
-主 UI 使用米白纸张、深蓝与青蓝高亮，统一 NinePatch 和 CampTextureButton 内容居中。正式 Logo、现有模型衍生头像、武器图标和道具/技能图标复用；缺少角色天赋独立图标时不借用系统 Icon。主验收保持 1920×1080，局部等比适配而不修改项目 Stretch / 3D Camera。完整映射见 [CAMP 素材表](CAMP_HUD_ASSET_MAP.md)、[审计 JSON](CAMP_HUD_ASSET_AUDIT.json)，交互、原生字形居中与构建状态见 [接入报告](../docs/CAMP_HUD_2_0_IMPLEMENTATION_REPORT.md)。
+主 UI 使用米白纸张、深蓝与青蓝高亮，统一 NinePatch 和 CampTextureButton 内容居中。正式 Logo、现有模型衍生头像、武器图标和道具/技能图标复用；缺少角色天赋独立图标时不借用系统 Icon。主验收保持 1920×1080，局部等比适配而不修改项目 Stretch / 3D Camera。完整映射见 [CAMP 素材表](../docs/archive/2026-10/missing-sources.md#camp-hud-asset-map)、[审计 JSON](../docs/archive/2026-10/missing-sources.md#camp-hud-asset-audit-json)，交互、原生字形居中与构建状态见 [接入报告](../docs/archive/2026-10/missing-sources.md#camp-hud-2-0-implementation-report)。

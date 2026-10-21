@@ -1,5 +1,15 @@
 export type RecordingContainer = 'webm' | 'mp4';
 
+export function resolveRecordingContainer(
+  preferred: RecordingContainer,
+  isSupported: (mime: string) => boolean,
+): RecordingContainer {
+  if (isRecordingContainerSupported(preferred, isSupported)) return preferred;
+  const fallback = preferred === 'mp4' ? 'webm' : 'mp4';
+  if (isRecordingContainerSupported(fallback, isSupported)) return fallback;
+  throw new Error('当前设备不支持 MP4 或 WebM 录制');
+}
+
 export const RECORDING_MIME_CANDIDATES_BY_CONTAINER = {
   webm: ['video/webm;codecs=vp8', 'video/webm;codecs=vp9', 'video/webm'],
   mp4: [

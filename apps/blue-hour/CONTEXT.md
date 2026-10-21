@@ -1,6 +1,6 @@
 # 蓝时归航术语
 
-本文件统一《蓝时归航》的玩法用语。产品方向见 [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md)，实现状态与迭代讨论见 [docs/PLAN.md](docs/PLAN.md)。
+本文件统一《蓝时归航》的玩法用语。产品方向见 [产品方向](docs/design/vision.md)，实现状态与迭代讨论见 [docs/PLAN.md](docs/PLAN.md)。
 
 ## Language
 

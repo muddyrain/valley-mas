@@ -1,13 +1,22 @@
-# Web 前台协作入口
+# Web 协作入口
 
-## AI 任务最小上下文入口
+适用于 `apps/web`。公共站与站主私有创作室的产品边界以 CONTEXT 为准。
 
-- `CLAUDE.md` -> `apps/web/AGENTS.md` -> `src/App.tsx` -> `src/stores/useAuthStore.ts`。
-- 跨接口改动再读 `server/internal/router/router.go`。
+## 按任务读取
 
-## 局部边界
+| 任务 | 入口 |
+|---|---|
+| 产品、术语或公开/私有边界 | [领域上下文](CONTEXT.md)、[产品规格](docs/YUJI_PRODUCT_SPEC.md) |
+| 页面、路由或认证 | [路由](src/App.tsx)、[认证状态](src/stores/useAuthStore.ts) |
+| UI、主题或列表交互 | [公共组件](src/components/ui)，再读目标页面 |
+| 文章配套包或上传下载 | [配套包契约](docs/ARTICLE_PACKAGE_DESIGN.md)，联查 [服务端路由](../../server/internal/router/router.go) |
 
-- 保持既有主题 token、布局和 loading 组件；列表的搜索、筛选、分页必须与 URL 刷新和浏览器回退一致。
-- UI 模式先查 `src/components/ui/`；确需生成 shadcn 组件时使用仓库已安装版本，并在新增依赖前取得确认。
-- 认证、路由、上传下载和公开/私有内容改动补浏览器关键路径证据；具体检查命令见 `docs/PROJECT_GUIDE.md`。
-- `apps/web` 的浏览器调试与视觉验收必须使用 `chrome:control-chrome` 控制用户现有 Chrome 会话；不得启动空白隔离浏览器或改用独立 Playwright 浏览器。Chrome 不可用时明确报告阻塞，不静默换用其他浏览器表面。
+## 关键约束
+
+- 复用目标页面已有主题 token、布局、loading 和公共组件；边框使用语义色，列表搜索、筛选、分页与 URL 刷新和回退保持一致。
+- 公共站与创作室沿各自已有加载表现，不把某一种遮罩强加给所有页面。文案只保留用户操作、状态和必要业务说明，普通文案修改不增加源码快照断言。
+- 权限与公开/私有内容同时核对服务端和调用方；新增 UI 依赖遵循根规则。
+
+## 验证与文档
+
+认证、路由、上传下载和内容权限取得浏览器关键路径证据。探索式调试使用用户现有 Chrome 会话，连接不可用时说明限制；不以隔离浏览器替代该会话验收。验证命令见 [项目指南](../../docs/PROJECT_GUIDE.md)。产品边界变化更新 CONTEXT，功能契约变化更新对应设计或 ADR。

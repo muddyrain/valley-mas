@@ -29,7 +29,7 @@ P1-A 已接通营地真实资源、日期；P1-B 已接通胜败结束页、历�
 
 ### 2.2 阅读范围与方法
 
-已读取根 CLAUDE、项目 AGENTS / PROJECT_CONTEXT、README、PLAN / VALIDATION、[游戏定位契约](../design/game-design.md)、[跨日规格](../DAY_LOOP_SPEC.md)、[开局规格](../NEW_RUN_SPEC.md)、[今日行动旧规格](../TODAY_ACTION.md)、[效果规格](../EFFECT_SYSTEM_SPEC.md)、[目录职责](../architecture/project-structure.md)、[搜索规格](../EXPEDITION_SEARCH_GAMEPLAY.md)、[武器规格](../WEAPON_SYSTEM.md) 及武器升级 W2-4 契约。
+已读取根 CLAUDE、项目 AGENTS / PROJECT_CONTEXT、README、PLAN / VALIDATION、[游戏定位契约](../design/game-design.md)、[跨日规格](../archive/2026-10/stages/DAY_LOOP_SPEC.md)、[开局规格](../archive/2026-10/stages/NEW_RUN_SPEC.md)、[今日行动旧规格](../archive/2026-10/stages/TODAY_ACTION.md)、[效果规格](../archive/2026-10/stages/EFFECT_SYSTEM_SPEC.md)、[目录职责](../architecture/project-structure.md)、[搜索规格](../archive/2026-10/stages/EXPEDITION_SEARCH_GAMEPLAY.md)、[武器规格](../archive/2026-10/stages/WEAPON_SYSTEM.md) 及武器升级 W2-4 契约。
 
 复核 [10 月 20 日审计](2026-10-20_project_audit_and_next_phase_plan_report.md)、[P1-A](2026-10-20_p1_a_camp_campaign_binding_report.md)、[P1-B](2026-10-20_p1_b_run_end_screen_report.md)、[视觉精修](2026-10-21_p1_b_visual_refinement_report.md)。旧报告仅用于定位和历史对照；没有把旧通过项自动计入本轮通过数。
 
@@ -116,7 +116,7 @@ P1-A 已接通营地真实资源、日期；P1-B 已接通胜败结束页、历�
 | 武器随机改造、物品与特殊能力组合 | [官方商店页](https://store.steampowered.com/app/740080/Deadly_Days/) | 已核实 Build 方向；不照搬数量、数值和物品内容 |
 | 轻量房间、Tools 与自定义武器 | 官方商店明确 1.5 房间；[官方 1.5 链接](https://steamcommunity.com/games/740080/announcements/detail/2378411445034338636) 本轮抓取仅返回图片，细节由 [SteamDB 官方公告镜像](https://steamdb.info/patchnotes/5173172/) 读取 | 明确区分官方链接可访问与正文由镜像读取；这是原作后续扩展，不是本作五日切片前置条件 |
 
-待核实：原作最新版本的任意武器转交全部限制、室内受伤 / 中断进度细则、精确每日候选数、每个任务的路程公式与结算参数。项目 [既有原作操作研究](../DEADLY_DAYS_CONTROLS_RESEARCH.md) 可帮助定位，不能替代本轮原作实机。
+待核实：原作最新版本的任意武器转交全部限制、室内受伤 / 中断进度细则、精确每日候选数、每个任务的路程公式与结算参数。项目 [既有原作操作研究](../archive/2026-10/stages/DEADLY_DAYS_CONTROLS_RESEARCH.md) 可帮助定位，不能替代本轮原作实机。
 
 本作应保留：3D 小队、正式二次元幸存者、BLUE HOUR 临界预警、全员巴士归航、首次缺粮宽限、五日终点。无需复制原作汉堡故事、Boss、房间名称或无限扩展的内容量；也不应转成单人射击或背包拼图。
 

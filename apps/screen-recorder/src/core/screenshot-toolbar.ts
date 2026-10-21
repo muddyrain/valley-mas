@@ -1,6 +1,6 @@
 import type { Rectangle } from './geometry';
 
-const TOOLBAR_WIDTH = 611;
+const TOOLBAR_WIDTH = 695;
 const TOOLBAR_HEIGHT = 48;
 const TOOLBAR_GAP = 12;
 const VIEWPORT_INSET = 12;
@@ -15,10 +15,12 @@ export function getScreenshotToolbarPosition(
     Math.min(maxLeft, selection.x + selection.width - TOOLBAR_WIDTH),
   );
   const below = selection.y + selection.height + TOOLBAR_GAP;
+  const toolbarHeight =
+    TOOLBAR_HEIGHT + (Math.ceil(TOOLBAR_WIDTH / Math.max(1, viewport.width - 24)) - 1) * 42;
   const top =
-    below + TOOLBAR_HEIGHT <= viewport.height - VIEWPORT_INSET
+    below + toolbarHeight <= viewport.height - VIEWPORT_INSET
       ? below
-      : Math.max(VIEWPORT_INSET, selection.y - TOOLBAR_HEIGHT - TOOLBAR_GAP);
+      : Math.max(VIEWPORT_INSET, selection.y - toolbarHeight - TOOLBAR_GAP);
 
   return { left, top };
 }

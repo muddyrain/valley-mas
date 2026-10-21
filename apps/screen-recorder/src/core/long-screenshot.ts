@@ -37,6 +37,11 @@ export type LongScreenshotMatchHistory = BitmapFrame;
 
 const MAX_LONG_SCREENSHOT_HEIGHT = 30_000;
 const MAX_LONG_SCREENSHOT_BYTES = 256 * 1024 * 1024;
+
+export function getLongScreenshotMaximumHeight(width: number): number {
+  if (!Number.isInteger(width) || width < 1) throw new Error('长截图画面宽度无效');
+  return Math.min(MAX_LONG_SCREENSHOT_HEIGHT, Math.floor(MAX_LONG_SCREENSHOT_BYTES / (width * 4)));
+}
 const MAX_COARSE_SHIFT_CANDIDATES = 100;
 const MATCH_VERTICAL_EDGE_TRIM_RATIO = 0.15;
 const MATCH_HORIZONTAL_EDGE_TRIM_RATIO = 0.3;
@@ -494,7 +499,7 @@ export function composeLongScreenshot(slices: LongScreenshotSlice[]): BitmapFram
     throw new Error('长截图画面尺寸不一致');
   }
   const height = slices.reduce((total, slice) => total + slice.appendRows, 0);
-  if (height > MAX_LONG_SCREENSHOT_HEIGHT || width * height * 4 > MAX_LONG_SCREENSHOT_BYTES) {
+  if (height > getLongScreenshotMaximumHeight(width)) {
     throw new Error('长截图过长，请提前完成捕获');
   }
   if (

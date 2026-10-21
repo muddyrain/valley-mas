@@ -23,6 +23,7 @@ export type AnnotationAction =
       type: 'mosaic';
       points: Point[];
       mosaicSize: AnnotationMosaicSize;
+      gridOffset?: Point;
     }
   | {
       type: 'text';
@@ -36,6 +37,33 @@ export type AnnotationTool = AnnotationAction['type'];
 
 export type MosaicBlock = { x: number; y: number; size: number };
 export type AnnotationSize = { width: number; height: number };
+
+export function rebaseAnnotations(
+  history: readonly AnnotationAction[],
+  previousOrigin: Point,
+  nextOrigin: Point,
+): AnnotationAction[] {
+  const move = (point: Point): Point => ({
+    x: point.x + previousOrigin.x - nextOrigin.x,
+    y: point.y + previousOrigin.y - nextOrigin.y,
+  });
+  return history.map((action) => {
+    if (action.type === 'text') return { ...action, at: move(action.at) };
+    if (action.type === 'mosaic') {
+      const { gridOffset, ...rest } = action;
+      const offset = move(gridOffset ?? { x: 0, y: 0 });
+      return {
+        ...rest,
+        points: action.points.map(move),
+        ...(offset.x !== 0 || offset.y !== 0 ? { gridOffset: offset } : {}),
+      };
+    }
+    if (action.type === 'pen') {
+      return { ...action, points: action.points.map(move) };
+    }
+    return { ...action, start: move(action.start), end: move(action.end) };
+  });
+}
 
 export function findTextAnnotationAt(
   history: readonly AnnotationAction[],
@@ -115,6 +143,7 @@ export function getMosaicBlocks(
   points: readonly Point[],
   bounds: { width: number; height: number },
   blockSize: number,
+  gridOffset: Point = { x: 0, y: 0 },
 ): MosaicBlock[] {
   const size = Math.max(1, Math.min(Math.floor(blockSize), bounds.width, bounds.height));
   if (points.length === 0 || bounds.width < 1 || bounds.height < 1) return [];
@@ -140,8 +169,21 @@ export function getMosaicBlocks(
   for (const point of samples) {
     for (let y = point.y - radius; y <= point.y + radius; y += size) {
       for (let x = point.x - radius; x <= point.x + radius; x += size) {
-        const left = Math.max(0, Math.min(bounds.width - size, Math.floor(x / size) * size));
-        const top = Math.max(0, Math.min(bounds.height - size, Math.floor(y / size) * size));
+        if (x + size <= 0 || y + size <= 0 || x >= bounds.width || y >= bounds.height) continue;
+        const left = Math.max(
+          0,
+          Math.min(
+            bounds.width - size,
+            Math.floor((x - gridOffset.x) / size) * size + gridOffset.x,
+          ),
+        );
+        const top = Math.max(
+          0,
+          Math.min(
+            bounds.height - size,
+            Math.floor((y - gridOffset.y) / size) * size + gridOffset.y,
+          ),
+        );
         blocks.set(`${left}:${top}`, { x: left, y: top, size });
       }
     }

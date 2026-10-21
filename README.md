@@ -12,6 +12,10 @@ Valley MAS 是一个 monorepo，包含个人内容展示站点、管理后台、
 | `apps/world-sim` | React + Pixi.js + TypeScript 沙盒文明模拟游戏。 |
 | `apps/toy-climb-arena` | Three.js 玩具世界攀爬游戏。 |
 | `apps/scratch-legend` | Next.js 刮刮卡增量游戏实验。 |
+| `apps/aeon-vale` | 原生 Godot 像素造世游戏。 |
+| `apps/blue-hour` | 原生 Godot 小队生存游戏。 |
+| `apps/ambient-forge` | Three.js 环境与音频实验。 |
+| `apps/screen-recorder`、`apps/port-warden` | Electron 桌面工具。 |
 | `server` | Gin + GORM Go 服务端。 |
 | `packages` | workspace 共享类型、请求、路由和格式化工具。 |
 | `docs` | 长期项目文档。 |
@@ -42,7 +46,7 @@ pnpm --filter @valley/admin dev
 pnpm --filter @valley/life-trace dev
 ```
 
-更多启动方式见 [项目指南](./docs/PROJECT_GUIDE.md)。
+更多启动方式见 [项目指南](docs/PROJECT_GUIDE.md)。
 
 ## 常用校验
 
@@ -55,6 +59,6 @@ cd server && go test ./...
 
 ## 文档入口
 
-- [项目文档索引](./docs/README.md)
-- [项目指南](./docs/PROJECT_GUIDE.md)
-- [AI 协作约定](./CLAUDE.md)
+- [项目文档索引](docs/README.md)
+- [项目指南](docs/PROJECT_GUIDE.md)
+- [AI 协作约定](AGENTS.md)

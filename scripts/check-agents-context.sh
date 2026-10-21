@@ -70,96 +70,33 @@ def find_agents_files() -> list[Path]:
 
 
 agents_files = find_agents_files()
-
 errors: list[str] = []
-heading_re = re.compile(r"^##\s*AI 任务最小上下文入口", re.M)
-reference_re = re.compile(r"^\s*`([^`\n]+)`\s*[。.]?\s*$")
-
-
-def section_lines(text: str, heading_name: str) -> list[str]:
-    lines = text.splitlines()
-    start = None
-    for idx, line in enumerate(lines):
-        if line.startswith("## ") and heading_name in line:
-            start = idx + 1
-            break
-    if start is None:
-        return []
-    section: list[str] = []
-    for line in lines[start:]:
-        if line.startswith("## "):
-            break
-        section.append(line)
-    return section
-
-
-def resolve_context_reference(agents_path: Path, reference: str) -> bool:
-    """Accept a local path relative to the AGENTS file or the repository root."""
-    if "#" in reference or "://" in reference:
-        return False
-
-    candidate_path = Path(reference)
-    candidates = [agents_path.parent / candidate_path, root / candidate_path]
-    return any(candidate.is_file() for candidate in candidates)
-
 
 for path in agents_files:
+    rel = path.relative_to(root).as_posix()
+    if rel == "AGENTS.md":
+        continue
     try:
         text = path.read_text(encoding="utf-8")
     except UnicodeDecodeError:
-        errors.append(f"{path}: encoding error (must be UTF-8)")
+        errors.append(f"{rel}: encoding error (must be UTF-8)")
         continue
 
-    relative_path = path.relative_to(root)
-    rel = relative_path.as_posix()
-
-    if rel == "AGENTS.md":
+    section = re.search(r"^## 按任务读取\s*$(.*?)(?=^## |\Z)", text, re.M | re.S)
+    if section is None:
+        errors.append(f"{rel}: missing section '按任务读取'")
         continue
+    links = re.findall(r"\[[^\]]+\]\(([^)]+)\)", section.group(1))
+    if not links:
+        errors.append(f"{rel}: task section needs at least one linked entry")
+    for reference in links:
+        target = reference.split("#", 1)[0]
+        if not target or "://" in target or Path(target).is_absolute():
+            errors.append(f"{rel}: task entry must be a relative local path: {reference}")
+        elif not (path.parent / target).exists():
+            errors.append(f"{rel}: task entry target is missing: {reference}")
 
-    if not heading_re.search(text):
-        errors.append(f"{rel}: missing section 'AI 任务最小上下文入口'")
-        continue
-
-    section = section_lines(text, "AI 任务最小上下文入口")
-    bullets = [line.strip() for line in section if line.startswith("- ")]
-    chain_lines = [line for line in bullets if "->" in line]
-    if len(chain_lines) < 1:
-        errors.append(f"{rel}: missing route chain under context section (need at least 1 line with `->`)")
-        continue
-
-    for chain_index, chain_line in enumerate(chain_lines, start=1):
-        items = [item.strip() for item in chain_line[2:].split("->")]
-        references: list[str] = []
-        for item_index, item in enumerate(items, start=1):
-            match = reference_re.fullmatch(item)
-            if not match:
-                errors.append(
-                    f"{rel}: route chain {chain_index} item {item_index} must be one backticked file path"
-                )
-                continue
-            references.append(match.group(1))
-
-        if not references:
-            continue
-
-        if references[0] != "CLAUDE.md":
-            errors.append(f"{rel}: route chain {chain_index} must start with `CLAUDE.md`")
-        elif not (root / "CLAUDE.md").is_file():
-            errors.append(f"{rel}: route chain {chain_index} first item `CLAUDE.md` is missing")
-
-        expected_self_reference = rel
-        if len(references) < 2 or references[1] != expected_self_reference:
-            errors.append(
-                f"{rel}: route chain {chain_index} second item must be `{expected_self_reference}`"
-            )
-
-        for item_index, reference in enumerate(references, start=1):
-            if not resolve_context_reference(path, reference):
-                errors.append(
-                    f"{rel}: route chain {chain_index} item {item_index} target is missing: `{reference}`"
-                )
-
-if not any(path.relative_to(root).as_posix() != "AGENTS.md" for path in agents_files):
+if len(agents_files) < 2:
     errors.append("no local AGENTS.md found under repository root")
 
 if errors:

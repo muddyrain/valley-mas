@@ -1,121 +1,61 @@
-# Valley MAS Harness Engineering
+# AI 协作与检查机制
 
-> 版本：v0.3 · 日期：2026-07-23
+本页用于修改协作规则、工具策略和检查器；普通业务任务从目标项目 AGENTS 进入。
 
-Harness Engineering 是面向 AI coding agent 的工程环境层。它通过清晰入口、稳定真源、工具边界、确定性检查、运行时证据和反馈回路，提高 Agent 在真实仓库中完成任务的成功率。
+## 规则与文档职责
 
-它不是业务运行时模块，不替代测试、类型检查、lint 和人工产品判断，也不要求把 implementer、reviewer、architect 等视角包装成虚拟角色。
-
-## 1. 核心原则
-
-```text
-任务执行 -> 验证与 review -> 发现重复失败 -> 转成文档、脚本、测试或 CI -> 再验证
-```
-
-优先把稳定、可机械判断的问题转成确定性门禁。提示词和 skill 只承载需要语境判断的流程，不能无限堆叠。
-
-## 2. 分层真源
-
-| 层级 | 唯一职责 |
+| 入口 | 职责 |
 |---|---|
-| `CLAUDE.md` | 根协作规则；`AGENTS.md` 是兼容软链接 |
-| `docs/PROJECT_GUIDE.md` | 项目定位、技术栈、模块地图、端口、环境变量和完整命令表 |
-| `docs/ARCHITECTURE_GUIDE.md` | 共享模块、协议迁移和复杂状态协调的按需架构判断 |
-| `.agents/skills/INDEX.md` | 项目 skills 分类、触发条件和组合上限 |
-| `.agents/skills/*/SKILL.md` | Valley 专项流程与检查方法 |
-| `apps/*/AGENTS.md`、`server/AGENTS.md` | 子项目局部规则和入口 |
-| `docs/patterns/agent-pitfalls.md` | 已确认的 Agent 失败模式 |
-| `.code-review/` | 按改动风险加载的 review 清单 |
-| `docs/specs/`、`docs/plans/` | 经确认的一次性设计与实施产物，不替代长期产品计划 |
+| [根 AGENTS](../AGENTS.md) | 仓库共同规则与项目导航；CLAUDE.md 仅包含 `@AGENTS.md` |
+| 局部 AGENTS | 本地关键约束与按任务读取表；[模板](../.agents/AGENTS_TEMPLATE.md) |
+| [项目指南](PROJECT_GUIDE.md) | 环境、运行和验证命令 |
+| [测试策略](TESTING_STRATEGY.md) / [架构指南](ARCHITECTURE_GUIDE.md) | 需要作取舍时的专项参考 |
+| 项目 CONTEXT / 主题文档 | 产品语言、当前行为和接口契约 |
+| [计划索引](plans/README.md) | 跨模块计划生命周期及各项目状态入口 |
+| [skills 索引](../.agents/skills/INDEX.md) | 明确命中专项流程时再加载 |
 
-`.codex/skills`、`.claude/skills`、`.codebase/skills`、`.trae/skills` 通过软链接指向 `.agents/skills`，避免多份 skill 内容漂移。
+规则中只保留每次任务都需要的约束。特定任务通过“触发条件 → 主题入口”读取；配置、版本和脚本已经表达的事实直接查对应文件。当前状态不在多个文档中重复维护。
 
-## 3. 确定性 Harness 检查
+普通执行报告写在交付回复；截图、日志和一次性诊断进入项目输出目录或 `.tmp/`。需要长期保存的决策、契约和验收基线更新指定文档。已完成计划和历史证据进入 `archive/YYYY-MM/`，归档不意味着旧 TODO 已完成。
 
-`scripts/check-agent-harness.sh` 提供只读健康检查，统一入口为：
+## 确定性检查
 
-```bash
-pnpm check:harness
-```
+| 命令 | 检查范围 |
+|---|---|
+| `pnpm check:harness` | AGENTS 正文、CLAUDE 引用、局部入口导航、递归 skills 索引、工具兼容链接及 GitNexus 纯索引配置 |
+| `pnpm check:agents-context` | 局部“按任务读取”有有效的本地链接；不规定阅读顺序或长链 |
+| `pnpm check:docs-links -- --strict` | 根文档、apps/server/packages 文档、模板和索引中的正式文件链接 |
+| `pnpm check:plans-index` | 根跨模块计划的活跃/归档集合与索引一致 |
 
-当前检查：
+前三项分别有同名 `:test` fixture 回归。检查器只报告并返回状态，不自动改文件。文档链接检查将 `test-output/`、`build/`、`dist/` 等生成证据缺失单独计数，不要求新检出仓库携带本地截图或 EXE；正式源文档、代码和资产的缺失在 strict 模式失败。链接检查不验证远端 URL、标题锚点和材料内容是否正确。
 
-- skill 目录与 `.agents/skills/INDEX.md` 双向一致。
-- 四个工具兼容入口是指向 `../.agents/skills` 的软链接。
-- `AGENTS.md -> CLAUDE.md` 兼容链接、根入口引用的子项目 AGENTS 文件均存在。
-- 核心文档入口存在。
-- 根 `package.json` 包含 Harness、check 和 build 脚本。
+`AGENTS.md` 和 `CLAUDE.md` 都是普通文件，避免跨系统软链接检出造成规则正文缺失。skills 仍通过 `.claude/.codex/.codebase/.trae/skills` 引用 `.agents/skills`。
 
-所有局部 `AGENTS.md` 的最小上下文入口由 `pnpm check:agents-context` 检查：上下文链必须以根 `CLAUDE.md` 开始、第二项指向当前局部 `AGENTS.md`，且链中声明的文件必须真实存在（可相对局部目录或仓库根）。fixture 回归入口为：
+CI 的 Quality 工作流执行 Harness、上下文及其回归、严格文档链接及其回归、计划索引、workspace 检查和构建、Web 测试与覆盖率、Go 测试；以工作流文件为执行事实。
 
-```bash
-pnpm check:agents-context:test
-```
+## 技能范围
 
-检查器只报告可操作错误并返回非零状态，不自动修改文件。fixture 测试入口为：
+仓库仅保留编码检查、文档审计、Web 性能审阅和提交规范四项，具体触发见索引。UI 与文案约束归对应应用和根规则；汇报、完成判断不再分别加载技能。
 
-```bash
-pnpm check:harness:test
-```
+设计、GSAP、Godot、GitNexus、访谈等通用资料在个人层手动选用，Codex 通过技能的 `agents/openai.yaml` 中 `policy.allow_implicit_invocation: false` 控制自动调用。个人资料不是仓库运行或验证的依赖；相同技能只维护一个有效版本，不用索引文字代替宿主调用策略。
 
-`pnpm check:docs-links` 覆盖根 `CLAUDE.md`、局部 `AGENTS.md` 与 `docs/**/*.md`：不可移植的 `file://` 或仓库绝对路径仍会失败；相对链接先以报告模式输出，待存量清零后再使用 `pnpm check:docs-links -- --strict` 将未解析链接升级为门禁。其 fixture 回归入口为 `pnpm check:docs-links:test`。
+## GitNexus
 
-## 4. CI 与部署门禁
+按根 AGENTS 的风险条件使用图分析。先核对直接调用方与受影响流程，HIGH/CRITICAL 先说明；涉及共享接口、跨模块调用或结构重构的提交再用 `detect_changes` 核对范围，纯文档、格式化和局部小修无需图分析。
 
-`.github/workflows/quality.yml` 在 push 和 pull request 上运行：
+CLI 为 `node .gitnexus/run.cjs`，参数查命令帮助，repo 为 `valley-mas`。可选个人 GitNexus 技能提供进阶参考，不作为普通探索和修复的前置条件。
 
-- `pnpm check:harness`
-- `pnpm check:agents-context` 与 `pnpm check:agents-context:test`
-- `pnpm check`
-- `pnpm build`
-- `cd server && go test ./...`
+仓库 [.gitnexusrc](../.gitnexusrc) 将 `analyze.indexOnly` 设为 `true`，刷新索引只更新代码图谱，不向 AGENTS、CLAUDE 或技能目录注入文件。已有 runner 使用 `node .gitnexus/run.cjs analyze`；首次检出可运行 `npx gitnexus analyze --index-only`。Harness 检查此配置，避免精简后的规则和技能被重新安装。
 
-服务端部署工作流先执行 `go test ./...`，再构建服务与迁移程序、应用待执行的版本化迁移，最后重启服务。测试、构建或迁移任一步失败都会由 `set -euo pipefail` 中止部署，不会用不匹配的代码与数据库结构重启服务。
+脚本嵌入代码可能未被索引。UNKNOWN 或工具不可用时直接核对调用位置并执行对应回归，不能把目标未找到解释为无影响；只有确实需要图分析时才处理索引。
 
-当前优先完整验证，不引入 changed-files 第三方 action 或复杂 job matrix。后续只有在 CI 时间形成稳定数据后再优化增量执行。
+## 浏览器与运行时证据
 
-## 5. Review 与失败反馈
+- 探索本地 Web、当前登录态、控制台或网络时，使用可用浏览器控制工具连接用户现有 Chrome，优先复用目标标签并保留原 origin；localhost 与 127.0.0.1 的会话不同，刷新前核对未保存输入。
+- 当前会话无法连接时说明限制，不将隔离浏览器表述为该会话验收。确定性复现、回归和 CI 使用已有无头自动化；独立可见浏览器需要用户授权。
+- UI、响应式、动画、Canvas、Three.js、拖拽、滚动、loading 和路由验证可观察行为；设备权限、硬件和真实服务需要对应设备或明确手工验收。
+- 按风险记录工具/模式、目标、viewport、断言和证据路径。当前用户会话、fixture、无头和平台验证分别如实标注；不为一次验证新增依赖。
 
-Code review 从 `.code-review/README.md` 进入，根据改动范围加载 Security、correctness、Go 或 React/UI 规则，不默认创建固定数量的审查 Agent。
+## Review 与反馈
 
-已确认的 Agent 失败模式记录在 `docs/patterns/agent-pitfalls.md`。新条目必须来自真实事故或可证明的仓库问题。相同问题重复出现两次以上且可机械判断时，优先升级为：
-
-1. 测试或静态分析规则。
-2. Harness 检查脚本。
-3. CI 门禁。
-4. 最后才是新增文档或 skill 提示。
-
-## 6. 浏览器与运行时证据
-
-按任务选择浏览器与桌面调试工具，并在交付中清楚标注证据来源：
-
-- 普通本地 Web 页面的探索式 UI 调试、当前登录态、DevTools、控制台或网络检查，先使用 `chrome:control-chrome` 连接当前用户 Chrome，并复用已有标签页；不得仅为检查页面启动独立的可见浏览器、空窗口或新页面。没有可用标签页时，先说明限制并取得用户同意，不能静默切换到独立浏览器。导航或执行可能产生外部副作用的操作前同样取得用户同意。
-- 确定性复现、多步骤流程、回归测试、批量截图和 CI 浏览器验证，优先使用仓库已有的 Playwright 或其他确定性浏览器自动化，并默认无头运行。只有用户明确授权时才启动独立的可见浏览器。
-- agent-browser、Playwright CLI 或等价工具可用于轻量、可重复的无头验证，不替代普通页面的探索式调试；浏览器外的桌面 GUI 可使用 Computer Use 或等价桌面自动化。
-- 不为一次验证擅自新增浏览器依赖。真实设备权限、硬件、通知或真实外部服务无法由自动化代表时，补充手工验收。
-- 不得把 headless、fixture 或模拟服务的结果表述为用户当前登录 Chrome 会话中的实机结果，反之亦然。
-
-运行时证据记录（按风险采用，最短模板）：
-
-```text
-- 工具/模式：
-- 目标 URL 或 fixture：
-- viewport/设备：
-- 断言：
-- 截图或日志产物：
-```
-
-响应式、动画、Canvas、Three.js、拖拽、滚动、loading 和路由行为不能只凭 JSX、CSS、类型检查或 jsdom 结论宣称通过。永久 E2E 测试的取舍由 [`TESTING_STRATEGY.md`](./TESTING_STRATEGY.md) 统一定义。
-
-## 7. 暂缓能力
-
-以下能力在有足够失败样本和运行数据前不引入：
-
-- 固定三 Agent review 编排。
-- 全仓统一覆盖率阈值。
-- 基于启发式 file-tier 的自动测试要求。
-- Edit 后自动改写源码的 hook。
-- Agent read/edit ratio 等 session 指标。
-- 自动创建 issue、MR、部署或外部文档。
-
-后续评估优先看任务完成率、返工率、验证通过率、CI 耗时和重复 review 问题，而不是单独优化工具调用数量。
+[Review 入口](../.code-review/README.md)按改动风险选规则，不默认编排固定数量的 Agent。已证实的重复问题进入 [失败模式](patterns/agent-pitfalls.md)；能机械判断的优先转成测试或检查，减少提示词堆叠。

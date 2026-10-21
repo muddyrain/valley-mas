@@ -1,5 +1,7 @@
-# Example · AI 协作入口
+# Example 协作入口
 
-## AI 任务最小上下文入口
+## 按任务读取
 
-- `CLAUDE.md` -> `apps/example/AGENTS.md` -> `apps/example/src/App.tsx`。
+| 任务 | 入口 |
+|---|---|
+| 页面 | [应用](src/App.tsx) |

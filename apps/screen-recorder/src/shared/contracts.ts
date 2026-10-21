@@ -1,3 +1,4 @@
+import type { AnnotationPreferences, CapturePreferences } from '../core/capture-preferences';
 import type { DisplayGeometry, Rectangle } from '../core/geometry';
 import type { RecordingContainer } from '../core/mime';
 import type {
@@ -6,6 +7,7 @@ import type {
   RecordingOptions,
 } from '../core/recording-options';
 import type { ScreenCapturePermissionStatus } from '../core/screen-capture-permission';
+import type { ScreenshotOutputAction } from '../core/screenshot-command';
 import type { ScreenshotMode, ScreenshotState } from '../core/screenshot-state';
 import type { RecordingMode } from '../core/session';
 import type { ShortcutSettings } from '../core/shortcuts';
@@ -27,6 +29,10 @@ export const IPC_CHANNELS = {
   getPinnedScreenshot: 'screen-recorder:get-pinned-screenshot',
   closePinnedScreenshot: 'screen-recorder:close-pinned-screenshot',
   saveScreenshot: 'screen-recorder:save-screenshot',
+  copyScreenshot: 'screen-recorder:copy-screenshot',
+  getCapturePreferences: 'screen-recorder:get-capture-preferences',
+  updateRecordingPreferences: 'screen-recorder:update-recording-preferences',
+  updateAnnotationPreferences: 'screen-recorder:update-annotation-preferences',
   saveScreenshotAs: 'screen-recorder:save-screenshot-as',
   startLongScreenshot: 'screen-recorder:start-long-screenshot',
   finishLongScreenshot: 'screen-recorder:finish-long-screenshot',
@@ -147,9 +153,13 @@ export type RecorderApi = {
   getPinnedScreenshot(): Promise<{ dataUrl: string }>;
   closePinnedScreenshot(): Promise<void>;
   saveScreenshot(operationId: string, png: ArrayBuffer): Promise<void>;
+  copyScreenshot(operationId: string, png: ArrayBuffer): Promise<void>;
+  getCapturePreferences(): Promise<CapturePreferences>;
+  updateRecordingPreferences(configuration: RecordingConfiguration): Promise<void>;
+  updateAnnotationPreferences(preferences: AnnotationPreferences): Promise<void>;
   saveScreenshotAs(operationId: string, png: ArrayBuffer): Promise<{ saved: boolean }>;
   startLongScreenshot(operationId: string, firstFrame: ArrayBuffer): Promise<void>;
-  finishLongScreenshot(): Promise<void>;
+  finishLongScreenshot(action?: ScreenshotOutputAction): Promise<void>;
   cancelLongScreenshot(): Promise<void>;
   cancelScreenshotEdit(operationId: string): Promise<void>;
   updateConfiguredSelection(rect: Rectangle): Promise<void>;

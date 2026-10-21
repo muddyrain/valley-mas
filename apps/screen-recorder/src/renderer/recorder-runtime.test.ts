@@ -199,3 +199,86 @@ it('waits for the first cropped Canvas frame before starting file output', async
   expect(startWriting).toHaveBeenCalledOnce();
   runtime.dispose();
 });
+
+function createRunningRecorder() {
+  const track = {
+    stop: vi.fn(),
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+    getSettings: () => ({ width: 1920, height: 1080 }),
+  };
+  const stream = {
+    getTracks: () => [track],
+    getVideoTracks: () => [track],
+    getAudioTracks: () => [],
+  };
+  class FakeRecorder extends EventTarget {
+    static isTypeSupported = () => true;
+    state: RecordingState = 'inactive';
+    start = vi.fn(() => {
+      this.state = 'recording';
+    });
+    stop = vi.fn(() => {
+      this.state = 'inactive';
+      this.dispatchEvent(new Event('stop'));
+    });
+    requestData = vi.fn();
+  }
+  const recorder = new FakeRecorder();
+  vi.stubGlobal('MediaRecorder', new Proxy(FakeRecorder, { construct: () => recorder }));
+  vi.stubGlobal('navigator', { mediaDevices: { getDisplayMedia: vi.fn(async () => stream) } });
+  const api = {
+    prepareCapture: vi.fn(async () => plan),
+    startWriting: vi.fn(async () => ({ sessionId: 'session-1' })),
+    appendChunk: vi.fn(async () => undefined),
+    finish: vi.fn(async () => undefined),
+    abort: vi.fn(async () => undefined),
+  };
+  const onError = vi.fn();
+  const runtime = new RecorderRuntime(api as unknown as RecorderApi, () => undefined, onError);
+  const emitChunk = () => {
+    const event = Object.assign(new Event('dataavailable'), { data: new Blob(['video']) });
+    recorder.dispatchEvent(event);
+  };
+  return { runtime, api, track, recorder, onError, emitChunk };
+}
+
+it('stops capture and reports a write failure without waiting for the user to stop', async () => {
+  const { runtime, api, recorder, track, onError, emitChunk } = createRunningRecorder();
+  api.appendChunk.mockRejectedValueOnce(new Error('disk full'));
+  await runtime.begin(plan);
+  emitChunk();
+  emitChunk();
+  await vi.waitFor(() => expect(api.abort).toHaveBeenCalledOnce());
+  expect(track.stop).toHaveBeenCalledOnce();
+  expect(recorder.state).toBe('inactive');
+  expect(api.appendChunk).toHaveBeenCalledOnce();
+  expect(api.finish).not.toHaveBeenCalled();
+  expect(onError).toHaveBeenCalledWith(expect.stringContaining('disk full'));
+  runtime.dispose();
+});
+
+it('honors a stop received before startWriting resolves', async () => {
+  const { runtime, api, recorder } = createRunningRecorder();
+  api.startWriting.mockImplementationOnce(async () => {
+    runtime.requestStop();
+    return { sessionId: 'session-1' };
+  });
+  await runtime.begin(plan);
+  await vi.waitFor(() => expect(api.finish).toHaveBeenCalledOnce());
+  expect(recorder.stop).toHaveBeenCalledOnce();
+  expect(recorder.state).toBe('inactive');
+  runtime.dispose();
+});
+
+it('drains queued chunks before finishing a normal stop', async () => {
+  const { runtime, api, emitChunk } = createRunningRecorder();
+  await runtime.begin(plan);
+  emitChunk();
+  emitChunk();
+  runtime.requestStop();
+  await vi.waitFor(() => expect(api.finish).toHaveBeenCalledOnce());
+  expect(api.appendChunk).toHaveBeenCalledTimes(2);
+  expect(api.abort).not.toHaveBeenCalled();
+  runtime.dispose();
+});

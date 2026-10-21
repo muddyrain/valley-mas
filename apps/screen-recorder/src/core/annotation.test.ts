@@ -9,6 +9,7 @@ import {
   getMosaicBlocks,
   getTextFontSize,
   moveTextAnnotation,
+  rebaseAnnotations,
   resizeTextAnnotation,
   undoAnnotation,
 } from './annotation';
@@ -21,6 +22,46 @@ describe('screenshot annotation history', () => {
     color: '#2563eb',
     strokeWidth: 4,
   };
+
+  it('keeps every annotation attached to desktop pixels when the crop origin changes', () => {
+    const actions: AnnotationAction[] = [
+      rectangle,
+      { type: 'mosaic', points: [{ x: 180, y: 180 }], mosaicSize: 16 },
+      { type: 'pen', points: [{ x: 30, y: 40 }], color: '#2563eb', strokeWidth: 4 },
+      { type: 'text', at: { x: 90, y: 60 }, text: 'private', color: '#2563eb', fontScale: 1 },
+    ];
+    const next = rebaseAnnotations(actions, { x: 100, y: 100 }, { x: 164, y: 80 });
+    expect(next[0]).toEqual({ ...rectangle, start: { x: -54, y: 40 }, end: { x: 36, y: 100 } });
+    expect(next[1]).toEqual({
+      ...actions[1],
+      points: [{ x: 116, y: 200 }],
+      gridOffset: { x: -64, y: 20 },
+    });
+    expect(next[2]).toEqual({ ...actions[2], points: [{ x: -34, y: 60 }] });
+    expect(next[3]).toEqual({ ...actions[3], at: { x: 26, y: 80 } });
+    expect(actions[0]).toEqual(rectangle);
+    expect(rebaseAnnotations(next, { x: 164, y: 80 }, { x: 100, y: 100 })).toEqual(actions);
+  });
+
+  it('keeps the whole mosaic footprint anchored during moves that are not multiples of its block size', () => {
+    const action: AnnotationAction = {
+      type: 'mosaic',
+      points: [{ x: 180, y: 180 }],
+      mosaicSize: 16,
+    };
+    const [moved] = rebaseAnnotations([action], { x: 100, y: 100 }, { x: 157, y: 80 });
+    if (moved.type !== 'mosaic') throw new Error('Expected mosaic');
+    const originalBlocks = getMosaicBlocks(action.points, { width: 500, height: 320 }, 16);
+    const movedBlocks = getMosaicBlocks(
+      moved.points,
+      { width: 500, height: 320 },
+      16,
+      moved.gridOffset,
+    );
+    expect(movedBlocks.map((block) => ({ ...block, x: block.x + 57, y: block.y - 20 }))).toEqual(
+      originalBlocks,
+    );
+  });
 
   it('adds immutable annotation actions', () => {
     const history: AnnotationAction[] = [];

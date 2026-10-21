@@ -110,7 +110,7 @@ R1 的三次独跑 PASS 也是真实记录：修复前后 `--max-fps 30` 各一�
 
 前序复放断言时，当前脚部为 `(-16.552086, 0.045, 37)`，线头仍为 `(-16.644445, 0.045, 37)`。两者高度相同，差异在移动方向；guard.current_speed=2.8，数量级符合一个 1/30 秒移动步长。相位 10 ms 时同一路径、同一断言 gap=0。这直接支持“网格仍是上次重绘的位置”，不支持地面高度错位或队员被另一物理循环重复推进。
 
-VFX 的 20 Hz 节流在本次 R1 前已存在，且 [P02 报告](../EXPEDITION_RUNTIME_PERFORMANCE_P02_REPORT.md) 明确记载它是性能优化。`survivor_command.gd` 和 VFX 本轮 R1 diff 均未改动。**已证实的是既有节流与断言的契约冲突；R1 历史两次 build 没有相位遥测，不能追溯宣称其每次失败的相位也恰好是 41.98 ms。**
+VFX 的 20 Hz 节流在本次 R1 前已存在，且 [P02 报告](../archive/2026-10/stages/EXPEDITION_RUNTIME_PERFORMANCE_P02_REPORT.md) 明确记载它是性能优化。`survivor_command.gd` 和 VFX 本轮 R1 diff 均未改动。**已证实的是既有节流与断言的契约冲突；R1 历史两次 build 没有相位遥测，不能追溯宣称其每次失败的相位也恰好是 41.98 ms。**
 
 ### 4.4 其他因素的判定
 
