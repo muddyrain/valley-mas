@@ -75,6 +75,8 @@ func run() -> void:
 			var animation_node: StringName = StringName(String(expected).to_upper()) if expedition_candidate else expected
 			check(c.current_state == expected and c.playback.get_current_node() == animation_node, id + " state " + expected)
 			var rate := 1.0 if speed == 0.0 else clampf(speed / 2.8, 0.55, 1.6) if expedition_candidate else speed / (1.24486 if expected == &"Walk" else 2.27623)
+			if expedition_candidate and expected == &"Run":
+				rate *= 1.45
 			check(absf(c.playback_rate - rate) < .00001, id + " exact speed ratio")
 		var before: float = c.playback.get_current_play_position()
 		c.update_motion(2.8, 2.8, 0.0)

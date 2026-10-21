@@ -219,7 +219,7 @@ func run() -> void:
 		check(controller.current_state == &"Run", id + " Expedition Run state at low speed")
 		controller.update_motion(2.8, 2.8, 1.0 / 60.0)
 		check(controller.current_state == &"Run", id + " Run state")
-		check(is_equal_approx(controller.playback_rate, 1.0), id + " Expedition Run playback multiplier")
+		check(is_equal_approx(controller.playback_rate, 1.45), id + " Expedition Run playback multiplier")
 		controller.update_motion(0.0, 2.8, 1.0 / 60.0)
 		check(controller.current_state == &"Idle", id + " Run to Stop to Idle")
 		check(actor.selection_ring != null, id + " selection ring")

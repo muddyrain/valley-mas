@@ -484,6 +484,7 @@ tracks/21/keys = PackedFloat32Array(0, 1, -0.12996091, 0.07468871, 0.115518466, 
 [sub_resource type="Animation" id="Animation_6264a"]
 resource_name = "knife_idle"
 length = 8.333333
+loop_mode = 1
 tracks/0/type = "rotation_3d"
 tracks/0/imported = true
 tracks/0/enabled = true
@@ -642,6 +643,7 @@ tracks/21/keys = PackedFloat32Array(0, 1, -0.12780216, -0.24778385, 0.13237627, 
 [sub_resource type="Animation" id="Animation_shn52"]
 resource_name = "rifle_idle"
 length = 8.333333
+loop_mode = 1
 tracks/0/type = "rotation_3d"
 tracks/0/imported = true
 tracks/0/enabled = true
@@ -849,6 +851,7 @@ tracks/28/keys = PackedFloat32Array(0, 1, 0.9999268, 1.0000973, 0.9998871)
 [sub_resource type="Animation" id="Animation_3b74x"]
 resource_name = "rifle_run"
 length = 1.3666667
+loop_mode = 1
 tracks/0/type = "rotation_3d"
 tracks/0/imported = true
 tracks/0/enabled = true
@@ -1193,6 +1196,7 @@ tracks/21/keys = PackedFloat32Array(0, 1, -0.095528424, 0.039609153, 0.36440626,
 [sub_resource type="Animation" id="Animation_pn5iv"]
 resource_name = "survivor_idle"
 length = 8.333333
+loop_mode = 1
 tracks/0/type = "rotation_3d"
 tracks/0/imported = true
 tracks/0/enabled = true
@@ -1351,6 +1355,7 @@ tracks/21/keys = PackedFloat32Array(0, 1, -0.015637832, -0.15249927, -0.00149023
 [sub_resource type="Animation" id="Animation_5k0a8"]
 resource_name = "survivor_run"
 length = 5.133333
+loop_mode = 1
 tracks/0/type = "rotation_3d"
 tracks/0/imported = true
 tracks/0/enabled = true
@@ -1509,6 +1514,7 @@ tracks/21/keys = PackedFloat32Array(0, 1, 0.121495016, 0.111428075, -0.053224113
 [sub_resource type="Animation" id="Animation_l6ric"]
 resource_name = "survivor_walk"
 length = 2.0666666
+loop_mode = 1
 tracks/0/type = "rotation_3d"
 tracks/0/imported = true
 tracks/0/enabled = true
@@ -1667,6 +1673,7 @@ tracks/21/keys = PackedFloat32Array(0, 1, -0.069853224, -0.28978541, -0.03027197
 [sub_resource type="Animation" id="Animation_0pcrm"]
 resource_name = "unarmed_idle"
 length = 3.8333333
+loop_mode = 1
 tracks/0/type = "rotation_3d"
 tracks/0/imported = true
 tracks/0/enabled = true

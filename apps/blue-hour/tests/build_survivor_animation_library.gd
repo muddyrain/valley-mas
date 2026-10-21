@@ -13,6 +13,10 @@ const CLIPS: Dictionary = {
 	&"hit_reaction": "res://assets/characters/survivors/animations/reaction/hit_reaction.glb",
 	&"death": "res://assets/characters/survivors/animations/reaction/death.glb",
 }
+const LOOPING_CLIPS: Array[StringName] = [
+	&"survivor_idle", &"survivor_walk", &"survivor_run", &"rifle_idle",
+	&"rifle_run", &"knife_idle", &"unarmed_idle",
+]
 
 func _initialize() -> void:
 	var library := AnimationLibrary.new()
@@ -22,6 +26,8 @@ func _initialize() -> void:
 		var player := _find_player(scene)
 		var imported: Animation = player.get_animation(String(player.get_animation_list()[0]))
 		var animation := imported.duplicate() as Animation
+		# Imported GLBs do not carry the gameplay distinction between holds and events.
+		animation.loop_mode = Animation.LOOP_LINEAR if clip_name in LOOPING_CLIPS else Animation.LOOP_NONE
 		for track_index: int in animation.get_track_count():
 			var track_path := animation.track_get_path(track_index)
 			var bone_name := track_path.get_subname(0)

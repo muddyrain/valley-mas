@@ -62,7 +62,8 @@ var command_visual_update_count: int = 0
 var _command_line_update_elapsed: float = COMMAND_LINE_UPDATE_INTERVAL
 
 func setup(owner: Node3D) -> void:
-
+	# Read VisualRoot after Survivor's render interpolation (default priority 0).
+	process_priority = 1
 	mission = owner
 	selection_ring = _make_ring("SelectionRing", 1.7, 0.56, 0.09, Color("#d9f6ff"), 0.0)
 	search_feedback = _make_ring("SearchTargetFeedback", 1.5, 0.68, 0.09, Color("#57c8ff"), 0.0)
@@ -85,6 +86,9 @@ func _process(delta: float) -> void:
 	if _command_line_update_elapsed >= COMMAND_LINE_UPDATE_INTERVAL:
 		_redraw_command_lines()
 		_command_line_update_elapsed = fmod(_command_line_update_elapsed, COMMAND_LINE_UPDATE_INTERVAL)
+	for id: int in command_lines:
+		var line: Dictionary = command_lines[id]
+		_draw_command_line_head(line, line.member.get_ref() as Node3D)
 	if is_instance_valid(selected_member):
 		var valid: bool = not selected_member.dead and not selected_member.inside_building and not selected_member.boarding
 		selection_ring.visible = valid
@@ -156,12 +160,19 @@ func play_command_line(member: Node3D, point: Vector3, search_order: bool = fals
 		material.albedo_color = COMMAND_LINE_COLOR
 		view.material_override = material
 		add_child(view)
-		command_lines[id] = {"member": weakref(member), "view": view, "target": point, "elapsed": 0.0}
+		var body := MeshInstance3D.new()
+		body.name = "ThrottledBody"
+		body.mesh = ImmediateMesh.new()
+		body.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		body.material_override = material
+		view.add_child(body)
+		command_lines[id] = {"member": weakref(member), "view": view, "body": body, "target": point, "elapsed": 0.0}
 	var line: Dictionary = command_lines[id]
 	line.target = point
 	line.search_order = search_order
 	line.elapsed = 0.0
 	_draw_command_line(line, member)
+	_draw_command_line_head(line, member)
 
 func _advance_command_lines(delta: float) -> void:
 	for id: int in command_lines.keys():
@@ -188,19 +199,23 @@ func _redraw_command_lines() -> void:
 
 func _draw_command_line(line: Dictionary, member: Node3D) -> void:
 	command_visual_update_count += 1
-	var view: MeshInstance3D = line.view
-	var mesh: ImmediateMesh = view.mesh as ImmediateMesh
-	var start: Vector3 = member.global_position
+	var mesh: ImmediateMesh = line.body.mesh as ImmediateMesh
+	var start: Vector3 = _command_line_origin(member)
 	var end: Vector3 = mission.to_global(line.target)
 	var offset: Vector3 = end - start
 	offset.y = 0
 	mesh.clear_surfaces()
+	line.join = _ground_point(start, .045)
+	line.side = Vector3.ZERO
 	if offset.length_squared() < .0025:
 		return
 	var side: Vector3 = offset.normalized().cross(Vector3.UP) * COMMAND_LINE_WIDTH * .5
 	var segments: int = maxi(1, ceili(offset.length() / COMMAND_LINE_SEGMENT_LENGTH))
+	line.join = _ground_point(start.lerp(end, 1.0 / segments), .045)
+	line.side = side
 	mesh.surface_begin(Mesh.PRIMITIVE_TRIANGLES)
-	for index: int in segments:
+	# The leading segment is a fixed six-vertex connector updated each render frame.
+	for index: int in range(1, segments):
 		var a: Vector3 = _ground_point(start.lerp(end, float(index) / segments), .045)
 		var b: Vector3 = _ground_point(start.lerp(end, float(index + 1) / segments), .045)
 		for vertex: Vector3 in [a - side, a + side, b + side, a - side, b + side, b - side]:
@@ -223,6 +238,28 @@ func _draw_command_line(line: Dictionary, member: Node3D) -> void:
 		mesh.surface_add_vertex(to_local(flow_tip))
 		mesh.surface_add_vertex(to_local(flow_base + flow_side))
 		mesh.surface_add_vertex(to_local(flow_base - flow_side))
+	mesh.surface_end()
+
+func _command_line_origin(member: Node3D) -> Vector3:
+	return member.rig.global_position if is_instance_valid(member.rig) else member.global_position
+
+func _draw_command_line_head(line: Dictionary, member: Node3D) -> void:
+	var view: MeshInstance3D = line.view
+	var mesh: ImmediateMesh = view.mesh as ImmediateMesh
+	var start: Vector3 = _command_line_origin(member)
+	var offset: Vector3 = mission.to_global(line.target) - start
+	offset.y = 0
+	mesh.clear_surfaces()
+	view.visible = offset.length_squared() >= .0025
+	if not view.visible:
+		return
+	var a: Vector3 = _ground_point(start, .045)
+	var side: Vector3 = offset.normalized().cross(Vector3.UP) * COMMAND_LINE_WIDTH * .5
+	var b: Vector3 = line.join
+	var join_side: Vector3 = line.side
+	mesh.surface_begin(Mesh.PRIMITIVE_TRIANGLES)
+	for vertex: Vector3 in [a - side, a + side, b + join_side, a - side, b + join_side, b - join_side]:
+		mesh.surface_add_vertex(to_local(vertex))
 	mesh.surface_end()
 	var material: StandardMaterial3D = view.material_override as StandardMaterial3D
 	var color: Color = COMMAND_LINE_COLOR

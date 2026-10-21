@@ -6,6 +6,7 @@ const Arm = preload("res://survivors/humanoid_arm_constraint.gd")
 const AimModifier = preload("res://survivors/survivor_expedition_aim_modifier.gd")
 const GripModifier = preload("res://survivors/survivor_expedition_grip_modifier.gd")
 const MOVE_THRESHOLD: float = 0.08
+const RUN_PLAYBACK_MULTIPLIER: float = 1.45
 const HIT_DURATION: float = 0.32
 const SHOT_DURATION: float = 0.18
 
@@ -224,6 +225,8 @@ func _advance_runtime(speed: float, delta: float) -> void:
 		_transition(desired, desired in [&"ATTACK", &"DEATH"])
 	current_state = &"Walk" if desired == &"WALK" else &"Run" if moving and not _death_started else &"Idle"
 	playback_rate = clampf(speed / maxf(_motion_base, 0.1), 0.55, 1.6) if moving else 1.0
+	if desired in [&"RUN", &"RIFLE_RUN"]:
+		playback_rate *= RUN_PLAYBACK_MULTIPLIER
 	if desired in [&"ATTACK", &"DEATH"]:
 		playback_rate = 1.0
 	tree.set("parameters/Rate/scale", playback_rate)
